@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>La vie en rose · Floristería artesanal</title>
+  <meta name="description" content="Flores, plantas y detalles preparados con cariño. Compra online y entrega local.">
+  <meta property="og:title" content="La vie en rose · Flores con intención">
+  <meta property="og:description" content="Ramos, plantas y detalles para convertir cualquier día en una ocasión.">
+  <meta property="og:image" content="images/og-la-vie-en-rose.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="catalogo-real.css">
+</head>
+<body>
+  <div class="announcement">Entrega local · Flores frescas · Preparado a mano con amor</div>
+  <header class="nav">
+    <a class="brand" href="#inicio" aria-label="La vie en rose, inicio"><img src="images/logo-oficial.png" alt="La vie en rose"></a>
+    <button class="menu" aria-label="Abrir menú" aria-expanded="false">☰</button>
+    <nav class="links" aria-label="Navegación principal">
+      <a href="#catalogo" data-category="flores">Flores</a><a href="#catalogo" data-category="detalles">Detalles</a><a href="#catalogo" data-category="plantas">Plantas</a><a href="#nosotros">Sobre nosotros</a><a href="#contacto">Contacto</a>
+    </nav>
+    <button class="cartButton" id="open-cart" aria-label="Abrir carrito">Mi cesta <span id="cart-count">0</span></button>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="heroCopy"><p class="eyebrow">Floristería artesanal</p><h1>La vida se ve<br><i>mejor con flores.</i></h1><p class="lead">Ramos, plantas y pequeños detalles que parecen recién salidos de un jardín secreto.</p><div class="actions"><a class="button primary" href="#catalogo">Descubrir la colección</a><a class="textLink whatsapp-link" data-message="Hola, quiero hacer una consulta">Hablar por WhatsApp →</a></div><div class="tinyReview"><span>★★★★★</span> Flores con intención, envueltas con mimo.</div></div>
+      <div class="heroVisual"><div class="heroImage" role="img" aria-label="Atelier floral de La vie en rose"></div><div class="seal">FLORES<br><b>CON AMOUR</b><br>PARA TI</div><span class="scribble">pour toi ♡</span></div>
+    </section>
+
+    <div class="marquee"><span>FLORES &nbsp;✿&nbsp; DETALLES &nbsp;✿&nbsp; PLANTAS &nbsp;✿&nbsp; REGALOS CON ALMA &nbsp;✿&nbsp; HECHO A MANO &nbsp;✿&nbsp;</span></div>
+
+    <section class="shop" id="catalogo">
+      <div class="sectionHead"><div><p class="eyebrow">Nuestra boutique</p><h2>Pequeñas cosas,<br><i>grandes emociones</i></h2></div><p>Elige tu favorito, añádelo a la cesta y prepara un regalo inolvidable. Las flores pueden variar ligeramente según la temporada.</p></div>
+      <div class="categoryTabs" role="tablist" aria-label="Categorías"><button class="active" data-filter="todos">Todo</button><button data-filter="flores">Flores</button><button data-filter="detalles">Detalles</button><button data-filter="plantas">Plantas</button></div>
+      <div class="productGrid" id="product-grid"></div>
+    </section>
+
+    <section class="reviews" aria-label="Reseñas de Google"><div class="reviewIntro"><span class="googleMark">G</span><div><strong>Lo que dicen de nosotras</strong><p>Reseñas reales de Google</p></div></div><div id="trustindex-widget"><script defer async src="https://cdn.trustindex.io/loader.js?f05400878cf0808a0d669afef79"></script></div><span class="verified">✓ Verificado por Trustindex</span></section>
+
+    <section class="story storyCompact" id="nosotros"><div class="storyImage"><span>Hecho<br><b>a mano</b></span></div><div class="storyCopy"><p class="eyebrow">Flores con intención</p><h2>No hacemos ramos. <i>Componemos gestos.</i></h2><p>Elegimos cada tallo por su forma y su color, respetando el movimiento natural de cada flor. Envolvemos cada pedido como si fuera para alguien a quien queremos muchísimo.</p><div class="values"><span><b>01</b> Flor de temporada</span><span><b>02</b> Composición artesanal</span><span><b>03</b> Envoltorios cuidados</span></div><div class="storyCta" id="contacto"><div><p class="eyebrow">¿Tienes algo especial en mente?</p><h3>Cuéntanos tu historia.</h3><p>Bodas, cumpleaños, “porque sí” y todos esos momentos que merecen quedarse en la memoria.</p></div><a class="button primary whatsapp-link" data-message="Hola, me gustaría hacer un encargo personalizado">Escribir por WhatsApp</a></div></div></section>
+  </main>
+
+  <footer><a class="footerLogo" href="#inicio"><img src="images/logo-oficial.png" alt="La vie en rose"></a><div><b>VISÍTANOS</b><p>Consulta nuestra ubicación<br>y horario por WhatsApp</p></div><div><b>CATÁLOGO</b><p><a href="#catalogo" data-category="flores">Flores</a><br><a href="#catalogo" data-category="detalles">Detalles</a><br><a href="#catalogo" data-category="plantas">Plantas</a></p></div><div><b>HABLEMOS</b><p><a class="whatsapp-link" data-message="Hola, quiero más información">WhatsApp · Respuesta directa</a><br>Instagram · @lavieenrose</p></div><small>© 2026 La vie en rose · Hecho con pétalos y cariño</small></footer>
+
+  <div class="overlay" id="cart-overlay" hidden></div><aside class="cartDrawer" id="cart" aria-label="Carrito" aria-hidden="true"><div class="cartHead"><div><p class="eyebrow">Tu selección</p><h2>Mi cesta <span id="drawer-count">0</span></h2></div><button id="close-cart" aria-label="Cerrar carrito">×</button></div><div id="cart-items" class="cartItems"></div><div class="cartEmpty" id="cart-empty"><span>♡</span><h3>Tu cesta espera flores</h3><p>Añade algo bonito del catálogo.</p></div><div class="cartSummary"><div><span>Subtotal</span><strong id="cart-total">0,00 €</strong></div><p>La entrega se confirmará antes del pago.</p><button class="checkout" id="checkout">Continuar con el pedido</button><button class="whatsappOrder" id="whatsapp-order">Consultar cesta por WhatsApp</button></div></aside>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body></html>

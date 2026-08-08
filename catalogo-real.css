@@ -1,0 +1,122 @@
+.productImage,
+.cartThumb {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.productImage {
+  background-color: var(--blush);
+}
+
+.emptyCategory {
+  grid-column: 1 / -1;
+  padding: 72px 24px;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.emptyCategory span {
+  color: var(--hot);
+  font-size: 32px;
+}
+
+.emptyCategory h3 {
+  margin: 12px 0 8px;
+  font: 34px 'Italiana', serif;
+}
+
+.emptyCategory p {
+  margin: auto;
+  max-width: 480px;
+  color: #8a6570;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+#trustindex-widget {
+  flex: 1;
+  min-width: 280px;
+}
+
+.story.storyCompact {
+  min-height: 520px;
+  grid-template-columns: minmax(330px, 42%) 1fr;
+}
+
+.storyCompact .storyImage {
+  min-height: 520px;
+  background-size: cover;
+  background-position: 10% center;
+}
+
+.storyCompact .storyCopy {
+  padding: 58px clamp(38px, 7vw, 105px);
+}
+
+.storyCompact .storyCopy > h2 {
+  max-width: 720px;
+  margin: 12px 0 18px;
+  font-size: clamp(38px, 4vw, 58px);
+  line-height: 1.02;
+}
+
+.storyCompact .storyCopy > p:not(.eyebrow) {
+  max-width: 690px;
+  margin-bottom: 20px;
+}
+
+.storyCompact .values {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 22px;
+}
+
+.storyCompact .values span {
+  align-items: center;
+  border-right: 1px solid var(--line);
+  padding: 11px 14px;
+}
+
+.storyCompact .values span:first-child { padding-left: 0; }
+.storyCompact .values span:last-child { border-right: 0; }
+
+.storyCta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.storyCta h3 {
+  margin: 5px 0;
+  font: 28px 'Italiana', serif;
+}
+
+.storyCta p:not(.eyebrow) {
+  margin: 0;
+  max-width: 520px;
+  color: #704655;
+  font: 12px/1.6 Georgia, serif;
+}
+
+.storyCta .button { flex: 0 0 auto; }
+
+@media (max-width: 820px) {
+  .story.storyCompact { grid-template-columns: 1fr; }
+  .storyCompact .storyImage { min-height: 360px; }
+  .storyCompact .storyCopy { padding: 52px 7vw; }
+}
+
+@media (max-width: 560px) {
+  .storyCompact .storyImage { min-height: 310px; }
+  .storyCompact .storyCopy { padding: 42px 6vw; }
+  .storyCompact .storyCopy > h2 { font-size: 38px; }
+  .storyCompact .values { grid-template-columns: 1fr; }
+  .storyCompact .values span { border-right: 0; padding-left: 0; }
+  .storyCta { align-items: flex-start; flex-direction: column; }
+}
