@@ -45,7 +45,7 @@ const rawProducts = [
   ['Caja Sol Radiante','Caja de 20 girasoles',100,'detalles','Luminoso']
 ];
 
-const products = rawProducts.map((p, index) => ({ id: `r${String(index + 1).padStart(2, '0')}`, name: p[0], description: p[1], price: p[2], category: p[3], badge: p[4], image: `images/productos/ramo-${String(index + 1).padStart(2, '0')}.jpg` }));
+const products = rawProducts.map((p, index) => ({ id: `r${String(index + 1).padStart(2, '0')}`, name: p[0], description: p[1], price: p[2], category: p[3], badge: p[4], image: `images/productos/ramo-${String(index + 1).padStart(2, '0')}.jpg` })).filter(product => product.id !== 'r15');
 let cart = JSON.parse(localStorage.getItem('lavie-cart') || '{}');
 let activeFilter = 'todos';
 const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
