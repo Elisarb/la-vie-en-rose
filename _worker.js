@@ -17,30 +17,49 @@ async function createCheckout(request, env) {
   try { payload = await request.json(); } catch { return json({ error: 'Solicitud no válida.' }, 400); }
   const items = Array.isArray(payload.items) ? payload.items : [];
   if (!items.length || items.length > 42) return json({ error: 'La cesta está vacía o no es válida.' }, 400);
+  const fulfillment = payload.fulfillment === 'delivery' ? 'delivery' : 'pickup';
+  let deliveryAt = '';
+  if (fulfillment === 'delivery') {
+    const requested = new Date(payload.deliveryAt);
+    if (Number.isNaN(requested.getTime()) || requested.getTime() < Date.now() + 5 * 60 * 60 * 1000) return json({ error: 'La entrega debe solicitarse con al menos 5 horas de antelación.' }, 400);
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(requested);
+    const hour = Number(parts.find(part => part.type === 'hour')?.value);
+    const minute = Number(parts.find(part => part.type === 'minute')?.value);
+    if (hour < 10 || hour > 20 || (hour === 20 && minute > 30)) return json({ error: 'La hora de entrega debe estar entre las 10:00 y las 20:30.' }, 400);
+    deliveryAt = requested.toISOString();
+  }
 
   const origin = new URL(request.url).origin;
+  const orderRef = `LVR-${Date.now().toString(36).toUpperCase()}`;
   const form = new URLSearchParams({
     mode: 'payment', locale: 'es',
     success_url: `${origin}/api/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=cancelled`,
     'phone_number_collection[enabled]': 'true',
-    'shipping_address_collection[allowed_countries][0]': 'ES',
+    'payment_method_types[0]': 'card',
+    'invoice_creation[enabled]': 'true',
+    client_reference_id: orderRef,
+    'metadata[order_ref]': orderRef,
+    'metadata[fulfillment]': fulfillment,
+    'metadata[delivery_at]': deliveryAt,
     'custom_fields[0][key]': 'recipient_name',
     'custom_fields[0][label][type]': 'custom',
     'custom_fields[0][label][custom]': 'Nombre de quien recibe',
     'custom_fields[0][type]': 'text',
     'custom_fields[0][optional]': 'false',
-    'custom_fields[1][key]': 'delivery_date',
+    'custom_fields[1][key]': 'dedication',
     'custom_fields[1][label][type]': 'custom',
-    'custom_fields[1][label][custom]': 'Fecha de entrega solicitada',
+    'custom_fields[1][label][custom]': 'Dedicatoria (opcional)',
     'custom_fields[1][type]': 'text',
-    'custom_fields[1][optional]': 'false',
-    'custom_fields[2][key]': 'dedication',
-    'custom_fields[2][label][type]': 'custom',
-    'custom_fields[2][label][custom]': 'Dedicatoria (opcional)',
-    'custom_fields[2][type]': 'text',
-    'custom_fields[2][optional]': 'true'
+    'custom_fields[1][optional]': 'true'
   });
+  if (fulfillment === 'delivery') {
+    form.set('shipping_address_collection[allowed_countries][0]', 'ES');
+    form.set('shipping_options[0][shipping_rate_data][type]', 'fixed_amount');
+    form.set('shipping_options[0][shipping_rate_data][fixed_amount][amount]', '790');
+    form.set('shipping_options[0][shipping_rate_data][fixed_amount][currency]', 'eur');
+    form.set('shipping_options[0][shipping_rate_data][display_name]', 'Entrega Comunidad de Madrid');
+  }
 
   items.forEach((item, index) => {
     const product = CATALOG[String(item.id || '')];
@@ -65,7 +84,8 @@ async function confirmCheckout(url, env) {
   if (!response.ok) return Response.redirect(`${url.origin}/?checkout=cancelled`, 303);
   const session = await response.json();
   const state = session.status === 'complete' && session.payment_status === 'paid' ? 'success' : 'cancelled';
-  return Response.redirect(`${url.origin}/?checkout=${state}`, 303);
+  const ref = encodeURIComponent(session.client_reference_id || 'Confirmado');
+  return Response.redirect(`${url.origin}/?checkout=${state}&ref=${ref}`, 303);
 }
 
 export default {

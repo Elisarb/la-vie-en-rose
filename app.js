@@ -51,6 +51,8 @@ let activeFilter = 'todos';
 const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
 let toastTimer;
+const DELIVERY_FEE = 7.90;
+let fulfillment = 'pickup';
 
 function renderProducts() {
   const visible = products.filter(p => activeFilter === 'todos' || p.category === activeFilter);
@@ -61,7 +63,7 @@ function saveCart() { localStorage.setItem('lavie-cart', JSON.stringify(cart)); 
 function add(id) { cart[id] = (cart[id] || 0) + 1; saveCart(); show('Añadido a tu cesta ♡'); }
 function change(id, delta) { cart[id] = (cart[id] || 0) + delta; if (cart[id] <= 0) delete cart[id]; saveCart(); }
 function cartLines() { return Object.entries(cart).map(([id, qty]) => ({ product: products.find(p => p.id === id), qty })).filter(x => x.product); }
-function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), total = lines.reduce((n, x) => n + x.product.price * x.qty, 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url('${p.image}')"></div><div class="cartItemCopy"><h3>${p.name}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${p.id}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${p.id}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${p.id}" aria-label="Eliminar ${p.name}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
+function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), subtotal = lines.reduce((n, x) => n + x.product.price * x.qty, 0), total = subtotal + (fulfillment === 'delivery' ? DELIVERY_FEE : 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url('${p.image}')"></div><div class="cartItemCopy"><h3>${p.name}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${p.id}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${p.id}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${p.id}" aria-label="Eliminar ${p.name}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
 function openCart() { drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false'); overlay.hidden = false; document.body.classList.add('noScroll'); }
 function closeCart() { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); overlay.hidden = true; document.body.classList.remove('noScroll'); }
 function show(message) { toast.textContent = message; toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.hidden = true, 2600); }
@@ -77,7 +79,8 @@ document.querySelector('#close-cart').addEventListener('click', closeCart);
 overlay.addEventListener('click', closeCart);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 document.querySelector('#whatsapp-order').addEventListener('click', () => whatsapp(orderMessage()));
-document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('Conectaremos Stripe para activar el pago seguro'); return; } try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })) }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
+document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) { const earliest = new Date(Date.now() + 5 * 60 * 60 * 1000); earliest.setMinutes(Math.ceil(earliest.getMinutes() / 30) * 30, 0, 0); document.querySelector('#delivery-time').min = `${earliest.getFullYear()}-${String(earliest.getMonth() + 1).padStart(2, '0')}-${String(earliest.getDate()).padStart(2, '0')}T${String(earliest.getHours()).padStart(2, '0')}:${String(earliest.getMinutes()).padStart(2, '0')}`; } document.querySelector('#delivery-note').textContent = delivery ? 'Entrega fija en toda la Comunidad de Madrid: 7,90 €.' : 'Recogida gratuita. Te avisaremos cuando esté preparado.'; renderCart(); }));
+document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('El pago seguro está disponible en nuestra web de Cloudflare'); return; } const deliveryValue = document.querySelector('#delivery-time').value; if (fulfillment === 'delivery' && !deliveryValue) { show('Elige la fecha y hora de entrega'); return; } const deliveryAt = deliveryValue ? new Date(deliveryValue).toISOString() : ''; try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })), fulfillment, deliveryAt }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
 const menu = document.querySelector('.menu'), links = document.querySelector('.links');
 menu.addEventListener('click', () => { links.classList.toggle('open'); menu.setAttribute('aria-expanded', links.classList.contains('open')); });
 links.addEventListener('click', () => links.classList.remove('open'));
@@ -88,8 +91,11 @@ const checkoutState = new URLSearchParams(location.search).get('checkout');
 if (checkoutState === 'success') {
   cart = {};
   saveCart();
-  show('Pago confirmado. ¡Gracias por confiar en La Vie en Rose! ♡');
-  history.replaceState({}, '', location.pathname);
+  const ref = new URLSearchParams(location.search).get('ref') || 'Confirmado';
+  document.querySelector('#order-reference').textContent = ref;
+  document.querySelector('#order-modal').hidden = false;
+  document.querySelector('#confirm-whatsapp').addEventListener('click', () => whatsapp(`Hola, acabo de pagar mi pedido ${ref} en la web de La Vie en Rose. ¿Podéis confirmarme la preparación?`));
+  document.querySelector('#close-order').addEventListener('click', () => { document.querySelector('#order-modal').hidden = true; history.replaceState({}, '', location.pathname); });
 } else if (checkoutState === 'cancelled') {
   show('Pago cancelado. Tu cesta sigue guardada.');
   history.replaceState({}, '', location.pathname);
