@@ -11,6 +11,22 @@ async function stripe(path, env, init = {}) {
   return fetch(`https://api.stripe.com${path}`, { ...init, headers });
 }
 
+const madridClockMinutes = date => {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date);
+  return Number(parts.find(part => part.type === 'hour')?.value) * 60 + Number(parts.find(part => part.type === 'minute')?.value);
+};
+
+function earliestWorkingDelivery(from = new Date()) {
+  const cursor = new Date(Math.ceil(from.getTime() / 60000) * 60000);
+  let remaining = 5 * 60;
+  while (remaining > 0) {
+    const clock = madridClockMinutes(cursor);
+    if (clock >= 10 * 60 && clock < 20 * 60 + 30) remaining -= 1;
+    cursor.setTime(cursor.getTime() + 60000);
+  }
+  return cursor;
+}
+
 async function createCheckout(request, env) {
   if (!env.STRIPE_SECRET_KEY) return json({ error: 'Stripe todavía no está configurado.' }, 503);
   let payload;
@@ -18,14 +34,14 @@ async function createCheckout(request, env) {
   const items = Array.isArray(payload.items) ? payload.items : [];
   if (!items.length || items.length > 42) return json({ error: 'La cesta está vacía o no es válida.' }, 400);
   const fulfillment = payload.fulfillment === 'delivery' ? 'delivery' : 'pickup';
+  const customerEmail = String(payload.customerEmail || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || customerEmail.length > 254) return json({ error: 'Introduce un email válido para recibir el comprobante.' }, 400);
   let deliveryAt = '';
   if (fulfillment === 'delivery') {
     const requested = new Date(payload.deliveryAt);
-    if (Number.isNaN(requested.getTime()) || requested.getTime() < Date.now() + 5 * 60 * 60 * 1000) return json({ error: 'La entrega debe solicitarse con al menos 5 horas de antelación.' }, 400);
-    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(requested);
-    const hour = Number(parts.find(part => part.type === 'hour')?.value);
-    const minute = Number(parts.find(part => part.type === 'minute')?.value);
-    if (hour < 10 || hour > 20 || (hour === 20 && minute > 30)) return json({ error: 'La hora de entrega debe estar entre las 10:00 y las 20:30.' }, 400);
+    if (Number.isNaN(requested.getTime()) || requested.getTime() < earliestWorkingDelivery().getTime()) return json({ error: 'La entrega debe solicitarse con al menos 5 horas laborables de antelación.' }, 400);
+    const clock = madridClockMinutes(requested);
+    if (clock < 10 * 60 || clock > 20 * 60 + 30) return json({ error: 'La hora de entrega debe estar entre las 10:00 y las 20:30.' }, 400);
     deliveryAt = requested.toISOString();
   }
 
@@ -37,6 +53,8 @@ async function createCheckout(request, env) {
     cancel_url: `${origin}/?checkout=cancelled`,
     'phone_number_collection[enabled]': 'true',
     'payment_method_types[0]': 'card',
+    customer_email: customerEmail,
+    'payment_intent_data[receipt_email]': customerEmail,
     'invoice_creation[enabled]': 'true',
     client_reference_id: orderRef,
     'metadata[order_ref]': orderRef,

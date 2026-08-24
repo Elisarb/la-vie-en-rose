@@ -54,6 +54,24 @@ let toastTimer;
 const DELIVERY_FEE = 7.90;
 let fulfillment = 'pickup';
 
+function earliestWorkingDelivery(from = new Date()) {
+  const cursor = new Date(from);
+  cursor.setSeconds(0, 0);
+  cursor.setMinutes(cursor.getMinutes() + 1);
+  let remaining = 5 * 60;
+  while (remaining > 0) {
+    const minutes = cursor.getHours() * 60 + cursor.getMinutes();
+    if (minutes < 10 * 60) cursor.setHours(10, 0, 0, 0);
+    else if (minutes >= 20 * 60 + 30) { cursor.setDate(cursor.getDate() + 1); cursor.setHours(10, 0, 0, 0); }
+    else { cursor.setMinutes(cursor.getMinutes() + 1); remaining -= 1; }
+  }
+  cursor.setMinutes(Math.ceil(cursor.getMinutes() / 30) * 30, 0, 0);
+  if (cursor.getHours() * 60 + cursor.getMinutes() > 20 * 60 + 30) { cursor.setDate(cursor.getDate() + 1); cursor.setHours(10, 0, 0, 0); }
+  return cursor;
+}
+
+function localDateTime(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; }
+
 function renderProducts() {
   const visible = products.filter(p => activeFilter === 'todos' || p.category === activeFilter);
   if (!visible.length) { productGrid.innerHTML = '<div class="emptyCategory"><span>❀</span><h3>Muy pronto</h3><p>Estamos preparando esta colección. Escríbenos por WhatsApp si buscas algo especial.</p></div>'; return; }
@@ -79,8 +97,8 @@ document.querySelector('#close-cart').addEventListener('click', closeCart);
 overlay.addEventListener('click', closeCart);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 document.querySelector('#whatsapp-order').addEventListener('click', () => whatsapp(orderMessage()));
-document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) { const earliest = new Date(Date.now() + 5 * 60 * 60 * 1000); earliest.setMinutes(Math.ceil(earliest.getMinutes() / 30) * 30, 0, 0); document.querySelector('#delivery-time').min = `${earliest.getFullYear()}-${String(earliest.getMonth() + 1).padStart(2, '0')}-${String(earliest.getDate()).padStart(2, '0')}T${String(earliest.getHours()).padStart(2, '0')}:${String(earliest.getMinutes()).padStart(2, '0')}`; } document.querySelector('#delivery-note').textContent = delivery ? 'Entrega fija en toda la Comunidad de Madrid: 7,90 €.' : 'Recogida gratuita. Te avisaremos cuando esté preparado.'; renderCart(); }));
-document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('El pago seguro está disponible en nuestra web de Cloudflare'); return; } const deliveryValue = document.querySelector('#delivery-time').value; if (fulfillment === 'delivery' && !deliveryValue) { show('Elige la fecha y hora de entrega'); return; } const deliveryAt = deliveryValue ? new Date(deliveryValue).toISOString() : ''; try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })), fulfillment, deliveryAt }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
+document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) document.querySelector('#delivery-time').min = localDateTime(earliestWorkingDelivery()); document.querySelector('#delivery-note').textContent = delivery ? 'Entrega fija en toda la Comunidad de Madrid: 7,90 €.' : 'Recogida gratuita. Te avisaremos cuando esté preparado.'; renderCart(); }));
+document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('El pago seguro está disponible en nuestra web de Cloudflare'); return; } const emailInput = document.querySelector('#checkout-email'); const customerEmail = emailInput.value.trim(); if (!emailInput.checkValidity()) { emailInput.reportValidity(); return; } const deliveryValue = document.querySelector('#delivery-time').value; if (fulfillment === 'delivery' && !deliveryValue) { show('Elige la fecha y hora de entrega'); return; } const deliveryAt = deliveryValue ? new Date(deliveryValue).toISOString() : ''; try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })), fulfillment, deliveryAt, customerEmail }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
 const menu = document.querySelector('.menu'), links = document.querySelector('.links');
 menu.addEventListener('click', () => { links.classList.toggle('open'); menu.setAttribute('aria-expanded', links.classList.contains('open')); });
 links.addEventListener('click', () => links.classList.remove('open'));
