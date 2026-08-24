@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="catalogo-real.css">
   <link rel="stylesheet" href="checkout-flow.css">
+  <link rel="stylesheet" href="reviews.css">
 </head>
 <body>
   <div class="announcement">Entrega local · Flores frescas · Preparado a mano con amor</div>
@@ -37,7 +38,23 @@
       <div class="productGrid" id="product-grid"></div>
     </section>
 
-    <section class="reviews" aria-label="Reseñas de Google"><div class="reviewIntro"><span class="googleMark">G</span><div><strong>Lo que dicen de nosotras</strong><p>Reseñas reales de Google</p></div></div><div id="trustindex-widget"><script defer async src="https://cdn.trustindex.io/loader.js?f05400878cf0808a0d669afef79"></script></div><span class="verified">✓ Verificado por Trustindex</span></section>
+    <section class="reviews nativeReviews" aria-labelledby="reviews-title">
+      <div class="reviewIntro"><span class="googleMark" aria-hidden="true">G</span><div><strong id="reviews-title">Lo que dicen de nosotras</strong><p>Reseñas publicadas en Google</p></div></div>
+      <div class="reviewCarousel">
+        <div class="reviewRail" id="review-rail" tabindex="0" aria-label="Reseñas de clientes">
+          <article class="reviewCard"><div class="reviewMeta"><strong>Axel Gonzalez Camuñas</strong><span>★★★★★</span></div><p>“Pedí un ramo para mi novia y estoy súper agradecido, especialmente a Liz. Tuvo mucha paciencia conmigo, fue muy profesional y mejoró mis expectativas. Sin duda volveré.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Génesis Pirela</strong><span>★★★★★</span></div><p>“Una experiencia hermosa, atención impecable 💗”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Gabriela Ramirez</strong><span>★★★★★</span></div><p>“Excelente servicio, muy buena atención. La chica muy amable.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Adderly Medina</strong><span>★★★★★</span></div><p>“Lo mejor de lo mejor, excelente servicio y el mejor trato. Gracias por todo. 100% recomendado.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Tania Gallego</strong><span>★★★★★</span></div><p>“La atención fue muy oportuna y tienen facilidad de pago para personas que están en el exterior.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Maria Jose Peña</strong><span>★★★★★</span></div><p>“Las flores hermosas, la atención excelente. Me ayudaron con todo, súper rápido y bastante amables. Sin duda volvería a comprar aquí ❤️”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Quique Luquero Maireles</strong><span>★★★★★</span></div><p>“Gran atención. Floristería hermosa y bonita.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Stiven Restrepo</strong><span>★★★★★</span></div><p>“Muy amables, servicio espectacular y el producto 10/10. Muy buena energía. Lo recomiendo 100%.”</p><small>Publicado en Google</small></article>
+          <article class="reviewCard"><div class="reviewMeta"><strong>Kecamisas Store</strong><span>★★★★★</span></div><p>“Excelente trabajo y servicio, muy recomendado.”</p><small>Publicado en Google</small></article>
+        </div>
+        <div class="reviewControls"><button id="review-prev" type="button" aria-label="Reseñas anteriores">←</button><button id="review-next" type="button" aria-label="Más reseñas">→</button></div>
+      </div>
+    </section>
 
     <section class="story storyCompact" id="nosotros"><div class="storyImage"><span>Hecho<br><b>a mano</b></span></div><div class="storyCopy"><p class="eyebrow">Flores con intención</p><h2>No hacemos ramos. <i>Componemos gestos.</i></h2><p>Elegimos cada tallo por su forma y su color, respetando el movimiento natural de cada flor. Envolvemos cada pedido como si fuera para alguien a quien queremos muchísimo.</p><div class="values"><span><b>01</b> Flor de temporada</span><span><b>02</b> Composición artesanal</span><span><b>03</b> Envoltorios cuidados</span></div><div class="storyCta" id="contacto"><div><p class="eyebrow">¿Tienes algo especial en mente?</p><h3>Cuéntanos tu historia.</h3><p>Bodas, cumpleaños, “porque sí” y todos esos momentos que merecen quedarse en la memoria.</p></div><a class="button primary whatsapp-link" data-message="Hola, me gustaría hacer un encargo personalizado">Escribir por WhatsApp</a></div></div></section>
   </main>

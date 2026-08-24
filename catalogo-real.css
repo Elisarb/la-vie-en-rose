@@ -35,11 +35,6 @@
   line-height: 1.7;
 }
 
-#trustindex-widget {
-  flex: 1;
-  min-width: 280px;
-}
-
 .story.storyCompact {
   min-height: 520px;
   grid-template-columns: minmax(330px, 42%) 1fr;

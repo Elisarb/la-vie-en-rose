@@ -1,0 +1,85 @@
+.nativeReviews {
+  min-height: 0;
+  padding: 24px 6vw;
+  gap: 34px;
+  background: #fff;
+}
+
+.nativeReviews .reviewIntro {
+  flex: 0 0 205px;
+}
+
+.reviewCarousel {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.reviewRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(270px, 31%);
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  padding: 3px 2px 7px;
+}
+
+.reviewRail::-webkit-scrollbar { display: none; }
+
+.reviewCard {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  min-height: 152px;
+  padding: 18px 19px;
+  border: 1px solid #a6617835;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #fff, #fff8fa);
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reviewMeta strong { font: 15px 'Italiana', serif; }
+.reviewMeta span { color: #f4a900; font-size: 10px; letter-spacing: 1px; white-space: nowrap; }
+.reviewCard p { margin: 12px 0 14px; font: italic 12px/1.55 Georgia, serif; color: #69404e; }
+.reviewCard small { margin-top: auto; color: #92717c; font-size: 8px; letter-spacing: .8px; text-transform: uppercase; }
+
+.reviewControls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.reviewControls button {
+  width: 31px;
+  height: 31px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--berry);
+  cursor: pointer;
+}
+
+.reviewControls button:hover { background: var(--berry); color: #fff; }
+
+@media (max-width: 820px) {
+  .nativeReviews { display: block; text-align: left; }
+  .nativeReviews .reviewIntro { justify-content: flex-start; margin-bottom: 18px; }
+  .reviewRail { grid-auto-columns: minmax(260px, 55%); }
+}
+
+@media (max-width: 560px) {
+  .nativeReviews { padding: 28px 5vw 22px; }
+  .nativeReviews .reviewIntro { justify-content: center; text-align: left; }
+  .reviewRail { grid-auto-columns: 88%; }
+  .reviewCard { min-height: 166px; }
+}

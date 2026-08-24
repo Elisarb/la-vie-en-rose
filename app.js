@@ -105,6 +105,10 @@ links.addEventListener('click', () => links.classList.remove('open'));
 renderProducts();
 renderCart();
 
+const reviewRail = document.querySelector('#review-rail');
+document.querySelector('#review-prev')?.addEventListener('click', () => reviewRail.scrollBy({ left: -Math.min(reviewRail.clientWidth * .9, 620), behavior: 'smooth' }));
+document.querySelector('#review-next')?.addEventListener('click', () => reviewRail.scrollBy({ left: Math.min(reviewRail.clientWidth * .9, 620), behavior: 'smooth' }));
+
 const checkoutState = new URLSearchParams(location.search).get('checkout');
 if (checkoutState === 'success') {
   cart = {};
