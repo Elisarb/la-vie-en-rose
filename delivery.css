@@ -1,0 +1,5 @@
+.deliveryQuoteRow{display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:6px}
+.deliveryQuoteRow input{min-width:0}
+.deliveryQuoteRow button{border:0;background:var(--berry);color:#fff;padding:0 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+.deliveryQuoteRow button:disabled{opacity:.65;cursor:wait}
+#delivery-time-wrap>label:not(:first-child){margin-top:12px}

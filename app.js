@@ -52,14 +52,15 @@ const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
 let toastTimer;
-const DELIVERY_FEE = 7.90;
+let shopSettings = { pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
+let deliveryQuote = null;
 let fulfillment = 'pickup';
 
-function earliestWorkingDelivery(from = new Date()) {
+function earliestWorkingDelivery(from = new Date(), leadMinutes = shopSettings.deliveryLeadMinutes) {
   const cursor = new Date(from);
   cursor.setSeconds(0, 0);
   cursor.setMinutes(cursor.getMinutes() + 1);
-  let remaining = 5 * 60;
+  let remaining = leadMinutes;
   while (remaining > 0) {
     const minutes = cursor.getHours() * 60 + cursor.getMinutes();
     if (minutes < 10 * 60) cursor.setHours(10, 0, 0, 0);
@@ -92,11 +93,31 @@ async function loadCatalog() {
     // El catálogo incluido mantiene la tienda visible si la conexión falla puntualmente.
   }
 }
+async function loadShopSettings() {
+  try {
+    const response = await fetch('/api/settings', { headers: { accept: 'application/json' } });
+    if (!response.ok) return;
+    shopSettings = await response.json();
+    document.querySelector('#delivery-time-help').textContent = `Mínimo ${formatDuration(shopSettings.deliveryLeadMinutes)} laborables · Horario 10:00–20:30`;
+    updateFulfillmentNote();
+  } catch { /* Se mantienen valores seguros si el servicio no responde. */ }
+}
+function formatDuration(minutes) {
+  if (minutes < 60) return `${minutes} minutos`;
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+}
+function updateFulfillmentNote() {
+  const note = document.querySelector('#delivery-note');
+  if (fulfillment === 'pickup') note.textContent = `Recogida gratuita. Preparado aproximadamente en ${formatDuration(shopSettings.pickupLeadMinutes)} laborables.`;
+  else if (deliveryQuote) note.textContent = `Delivery ${euro(deliveryQuote.fee)} · distancia estimada ${deliveryQuote.distanceKm} km.`;
+  else note.textContent = 'Introduce la dirección para calcular el delivery.';
+}
 function saveCart() { localStorage.setItem('lavie-cart', JSON.stringify(cart)); renderCart(); }
 function add(id) { cart[id] = (cart[id] || 0) + 1; saveCart(); show('Añadido a tu cesta ♡'); }
 function change(id, delta) { cart[id] = (cart[id] || 0) + delta; if (cart[id] <= 0) delete cart[id]; saveCart(); }
 function cartLines() { return Object.entries(cart).map(([id, qty]) => ({ product: products.find(p => p.id === id), qty })).filter(x => x.product); }
-function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), subtotal = lines.reduce((n, x) => n + x.product.price * x.qty, 0), total = subtotal + (fulfillment === 'delivery' ? DELIVERY_FEE : 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url(&quot;${escapeHtml(p.image)}&quot;)"></div><div class="cartItemCopy"><h3>${escapeHtml(p.name)}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${escapeHtml(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${escapeHtml(p.id)}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${escapeHtml(p.id)}" aria-label="Eliminar ${escapeHtml(p.name)}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
+function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), subtotal = lines.reduce((n, x) => n + x.product.price * x.qty, 0), total = subtotal + (fulfillment === 'delivery' && deliveryQuote ? deliveryQuote.fee : 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url(&quot;${escapeHtml(p.image)}&quot;)"></div><div class="cartItemCopy"><h3>${escapeHtml(p.name)}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${escapeHtml(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${escapeHtml(p.id)}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${escapeHtml(p.id)}" aria-label="Eliminar ${escapeHtml(p.name)}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
 function openCart() { drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false'); overlay.hidden = false; document.body.classList.add('noScroll'); }
 function closeCart() { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); overlay.hidden = true; document.body.classList.remove('noScroll'); }
 function show(message) { toast.textContent = message; toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.hidden = true, 2600); }
@@ -112,14 +133,24 @@ document.querySelector('#close-cart').addEventListener('click', closeCart);
 overlay.addEventListener('click', closeCart);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 document.querySelector('#whatsapp-order').addEventListener('click', () => whatsapp(orderMessage()));
-document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) document.querySelector('#delivery-time').min = localDateTime(earliestWorkingDelivery()); document.querySelector('#delivery-note').textContent = delivery ? 'Entrega fija en toda la Comunidad de Madrid: 7,90 €.' : 'Recogida gratuita. Te avisaremos cuando esté preparado.'; renderCart(); }));
-document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('El pago seguro está disponible en nuestra web de Cloudflare'); return; } const emailInput = document.querySelector('#checkout-email'); const customerEmail = emailInput.value.trim(); if (!emailInput.checkValidity()) { emailInput.reportValidity(); return; } const deliveryValue = document.querySelector('#delivery-time').value; if (fulfillment === 'delivery' && !deliveryValue) { show('Elige la fecha y hora de entrega'); return; } const deliveryAt = deliveryValue ? new Date(deliveryValue).toISOString() : ''; try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })), fulfillment, deliveryAt, customerEmail }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
+document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) document.querySelector('#delivery-time').min = localDateTime(earliestWorkingDelivery()); updateFulfillmentNote(); renderCart(); }));
+document.querySelector('#delivery-address').addEventListener('input', () => { deliveryQuote = null; document.querySelector('#delivery-choice-price').textContent = 'Según distancia'; document.querySelector('#delivery-quote-status').textContent = 'Pulsa Calcular para obtener el precio.'; updateFulfillmentNote(); renderCart(); });
+document.querySelector('#calculate-delivery').addEventListener('click', async () => {
+  const address=document.querySelector('#delivery-address').value.trim(), button=document.querySelector('#calculate-delivery'), status=document.querySelector('#delivery-quote-status');
+  if(address.length<8){ show('Escribe la dirección completa de entrega'); return; }
+  button.disabled=true; button.textContent='Calculando…'; status.textContent='Localizando la dirección…';
+  try { const response=await fetch('/api/delivery/quote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({address})}); const data=await response.json(); if(!response.ok) throw new Error(data.error||'No pudimos calcular el delivery.'); deliveryQuote=data; status.textContent=`Dirección localizada · ${data.distanceKm} km desde la floristería`; document.querySelector('#delivery-choice-price').textContent=euro(data.fee); updateFulfillmentNote(); renderCart(); }
+  catch(error){ deliveryQuote=null; status.textContent=error.message; show(error.message); updateFulfillmentNote(); renderCart(); }
+  finally { button.disabled=false; button.textContent='Calcular'; }
+});
+document.querySelector('#checkout').addEventListener('click', async () => { if (!CONFIG.stripeCheckoutEndpoint) { show('El pago seguro está disponible en nuestra web de Cloudflare'); return; } const emailInput = document.querySelector('#checkout-email'); const customerEmail = emailInput.value.trim(); if (!emailInput.checkValidity()) { emailInput.reportValidity(); return; } const deliveryValue = document.querySelector('#delivery-time').value; if (fulfillment === 'delivery' && !deliveryQuote) { show('Calcula el precio del delivery antes de pagar'); return; } if (fulfillment === 'delivery' && !deliveryValue) { show('Elige la fecha y hora de entrega'); return; } const deliveryAt = deliveryValue ? new Date(deliveryValue).toISOString() : ''; try { const response = await fetch(CONFIG.stripeCheckoutEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cartLines().map(x => ({ id: x.product.id, quantity: x.qty })), fulfillment, deliveryAt, deliveryQuoteToken: deliveryQuote?.token || '', customerEmail }) }); const data = await response.json(); if (!response.ok || !data.url) throw new Error(data.error || 'No se pudo iniciar el pago.'); location.href = data.url; } catch (error) { show(error.message || 'No se pudo iniciar el pago. Escríbenos por WhatsApp.'); } });
 const menu = document.querySelector('.menu'), links = document.querySelector('.links');
 menu.addEventListener('click', () => { links.classList.toggle('open'); menu.setAttribute('aria-expanded', links.classList.contains('open')); });
 links.addEventListener('click', () => links.classList.remove('open'));
 renderProducts();
 renderCart();
 loadCatalog();
+loadShopSettings();
 
 const reviewRail = document.querySelector('#review-rail');
 document.querySelector('#review-prev')?.addEventListener('click', () => reviewRail.scrollBy({ left: -Math.min(reviewRail.clientWidth * .9, 620), behavior: 'smooth' }));

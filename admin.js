@@ -1,7 +1,7 @@
 const $ = selector => document.querySelector(selector);
 const euro = value => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(value);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-let products = [];
+let products = [], settings = null;
 
 async function optimizeImage(file) {
   const bitmap = await createImageBitmap(file);
@@ -33,7 +33,14 @@ function render() {
   $('#product-list').innerHTML = products.length ? products.map(p => `<article class="product-row" data-id="${escapeHtml(p.id)}"><img src="${escapeHtml(p.image)}" alt=""><div class="product-copy"><h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.description)}</p></div><div class="price">${euro(p.price)}</div><div class="category">${escapeHtml(p.category)}</div><div class="availability ${p.active?'':'unavailable'}"><span class="dot"></span>${p.active?'Disponible':'Pausado'}</div><button class="quiet edit">Editar</button></article>`).join('') : '<div class="empty">Aún no hay productos.</div>';
 }
 async function loadProducts() { products = await api('/api/admin/products'); render(); }
-async function showDashboard() { $('#login-view').hidden = true; $('#dashboard').hidden = false; await loadProducts(); }
+async function loadSettings() {
+  settings = await api('/api/admin/settings');
+  $('#store-address').value = settings.storeAddress || '';
+  $('#pickup-lead').value = settings.pickupLeadMinutes;
+  $('#delivery-lead').value = settings.deliveryLeadMinutes;
+  $('#resolved-address').textContent = settings.storeLat == null ? 'Añade la dirección exacta para activar el cálculo del delivery.' : 'Dirección localizada correctamente. Puedes cambiarla cuando sea necesario.';
+}
+async function showDashboard() { $('#login-view').hidden = true; $('#dashboard').hidden = false; await Promise.all([loadProducts(), loadSettings()]); }
 function openEditor(product) {
   $('#dialog-title').textContent = product ? 'Editar producto' : 'Nuevo producto';
   $('#product-id').value = product?.id || ''; $('#name').value = product?.name || ''; $('#price').value = product?.price ?? '';
@@ -49,6 +56,13 @@ $('#login-form').addEventListener('submit', async event => {
 });
 $('#logout').addEventListener('click', async () => { await api('/api/admin/logout',{method:'POST'}); $('#dashboard').hidden=true; $('#login-view').hidden=false; });
 $('#new-product').addEventListener('click', () => openEditor());
+$('#settings-form').addEventListener('submit', async event => {
+  event.preventDefault(); const button=$('#save-settings'); button.disabled=true; button.textContent='Localizando…';
+  try {
+    const result=await api('/api/admin/settings',{method:'PUT',body:JSON.stringify({storeAddress:$('#store-address').value,pickupLeadMinutes:$('#pickup-lead').value,deliveryLeadMinutes:$('#delivery-lead').value})});
+    settings=result.settings; $('#resolved-address').textContent=`Ubicación reconocida: ${result.resolvedAddress}`; notify('Ajustes de pedidos actualizados.');
+  } catch(error){ notify(error.message,true); } finally { button.disabled=false; button.textContent='Guardar ajustes'; }
+});
 $('#product-list').addEventListener('click', event => { const row=event.target.closest('.product-row'); if(row) openEditor(products.find(p=>p.id===row.dataset.id)); });
 document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click',()=>$('#editor').close()));
 $('#product-form').addEventListener('submit', async event => {
