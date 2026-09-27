@@ -3,3 +3,5 @@
 .deliveryQuoteRow button{border:0;background:var(--berry);color:#fff;padding:0 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
 .deliveryQuoteRow button:disabled{opacity:.65;cursor:wait}
 #delivery-time-wrap>label:not(:first-child){margin-top:12px}
+.map-credit{opacity:.78}
+.map-credit a{color:inherit;text-underline-offset:2px}

@@ -51,6 +51,7 @@ let activeFilter = 'todos';
 const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
+document.querySelector('#delivery-quote-status').insertAdjacentHTML('afterend', '<small class="map-credit">Ubicación con datos de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</small>');
 let toastTimer;
 let shopSettings = { pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
 let deliveryQuote = null;
