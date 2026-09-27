@@ -45,10 +45,11 @@ const rawProducts = [
   ['Caja Sol Radiante','Caja de 20 girasoles',100,'detalles','Luminoso']
 ];
 
-const products = rawProducts.map((p, index) => ({ id: `r${String(index + 1).padStart(2, '0')}`, name: p[0], description: p[1], price: p[2], category: p[3], badge: p[4], image: `images/productos/ramo-${String(index + 1).padStart(2, '0')}.jpg` })).filter(product => product.id !== 'r15');
+let products = rawProducts.map((p, index) => ({ id: `r${String(index + 1).padStart(2, '0')}`, name: p[0], description: p[1], price: p[2], category: p[3], badge: p[4], image: `images/productos/ramo-${String(index + 1).padStart(2, '0')}.jpg` })).filter(product => product.id !== 'r15');
 let cart = JSON.parse(localStorage.getItem('lavie-cart') || '{}');
 let activeFilter = 'todos';
 const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
 let toastTimer;
 const DELIVERY_FEE = 7.90;
@@ -75,13 +76,27 @@ function localDateTime(date) { return `${date.getFullYear()}-${String(date.getMo
 function renderProducts() {
   const visible = products.filter(p => activeFilter === 'todos' || p.category === activeFilter);
   if (!visible.length) { productGrid.innerHTML = '<div class="emptyCategory"><span>❀</span><h3>Muy pronto</h3><p>Estamos preparando esta colección. Escríbenos por WhatsApp si buscas algo especial.</p></div>'; return; }
-  productGrid.innerHTML = visible.map(p => `<article class="productCard"><div class="productImage" style="background-image:url('${p.image}')"><span>${p.badge}</span><button class="quickAdd" data-add="${p.id}" aria-label="Añadir ${p.name}">＋</button></div><div class="productInfo"><small>${p.category}</small><div><h3>${p.name}</h3><strong>${euro(p.price)}</strong></div><p>${p.description}</p><button class="addButton" data-add="${p.id}">Añadir a la cesta <span>＋</span></button></div></article>`).join('');
+  productGrid.innerHTML = visible.map(p => `<article class="productCard"><div class="productImage" style="background-image:url(&quot;${escapeHtml(p.image)}&quot;)"><span>${escapeHtml(p.badge)}</span><button class="quickAdd" data-add="${escapeHtml(p.id)}" aria-label="Añadir ${escapeHtml(p.name)}">＋</button></div><div class="productInfo"><small>${escapeHtml(p.category)}</small><div><h3>${escapeHtml(p.name)}</h3><strong>${euro(p.price)}</strong></div><p>${escapeHtml(p.description)}</p><button class="addButton" data-add="${escapeHtml(p.id)}">Añadir a la cesta <span>＋</span></button></div></article>`).join('');
+}
+async function loadCatalog() {
+  try {
+    const response = await fetch('/api/products', { headers: { accept: 'application/json' } });
+    const catalog = await response.json();
+    if (!response.ok || !Array.isArray(catalog)) throw new Error('CATALOG_UNAVAILABLE');
+    products = catalog;
+    Object.keys(cart).forEach(id => { if (!products.some(product => product.id === id)) delete cart[id]; });
+    localStorage.setItem('lavie-cart', JSON.stringify(cart));
+    renderProducts();
+    renderCart();
+  } catch {
+    // El catálogo incluido mantiene la tienda visible si la conexión falla puntualmente.
+  }
 }
 function saveCart() { localStorage.setItem('lavie-cart', JSON.stringify(cart)); renderCart(); }
 function add(id) { cart[id] = (cart[id] || 0) + 1; saveCart(); show('Añadido a tu cesta ♡'); }
 function change(id, delta) { cart[id] = (cart[id] || 0) + delta; if (cart[id] <= 0) delete cart[id]; saveCart(); }
 function cartLines() { return Object.entries(cart).map(([id, qty]) => ({ product: products.find(p => p.id === id), qty })).filter(x => x.product); }
-function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), subtotal = lines.reduce((n, x) => n + x.product.price * x.qty, 0), total = subtotal + (fulfillment === 'delivery' ? DELIVERY_FEE : 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url('${p.image}')"></div><div class="cartItemCopy"><h3>${p.name}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${p.id}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${p.id}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${p.id}" aria-label="Eliminar ${p.name}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
+function renderCart() { const lines = cartLines(), count = lines.reduce((n, x) => n + x.qty, 0), subtotal = lines.reduce((n, x) => n + x.product.price * x.qty, 0), total = subtotal + (fulfillment === 'delivery' ? DELIVERY_FEE : 0); document.querySelector('#cart-count').textContent = count; document.querySelector('#drawer-count').textContent = count; document.querySelector('#cart-total').textContent = euro(total); document.querySelector('#cart-empty').hidden = lines.length > 0; document.querySelector('#cart-items').innerHTML = lines.map(({ product: p, qty }) => `<div class="cartItem"><div class="cartThumb" style="background-image:url(&quot;${escapeHtml(p.image)}&quot;)"></div><div class="cartItemCopy"><h3>${escapeHtml(p.name)}</h3><p>${euro(p.price)}</p><div class="quantity"><button data-change="-1" data-id="${escapeHtml(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-change="1" data-id="${escapeHtml(p.id)}" aria-label="Añadir uno">＋</button></div></div><button class="remove" data-remove="${escapeHtml(p.id)}" aria-label="Eliminar ${escapeHtml(p.name)}">×</button></div>`).join(''); document.querySelector('.cartSummary').hidden = !lines.length; }
 function openCart() { drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false'); overlay.hidden = false; document.body.classList.add('noScroll'); }
 function closeCart() { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); overlay.hidden = true; document.body.classList.remove('noScroll'); }
 function show(message) { toast.textContent = message; toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.hidden = true, 2600); }
@@ -104,6 +119,7 @@ menu.addEventListener('click', () => { links.classList.toggle('open'); menu.setA
 links.addEventListener('click', () => links.classList.remove('open'));
 renderProducts();
 renderCart();
+loadCatalog();
 
 const reviewRail = document.querySelector('#review-rail');
 document.querySelector('#review-prev')?.addEventListener('click', () => reviewRail.scrollBy({ left: -Math.min(reviewRail.clientWidth * .9, 620), behavior: 'smooth' }));
