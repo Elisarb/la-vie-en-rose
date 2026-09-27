@@ -22,5 +22,5 @@
 .cartSummary{max-height:68vh;overflow-y:auto}
 .pickupReady{margin:1px 0 8px!important;padding:7px 9px;border-left:2px solid #e9afc3;background:#fff9fb;color:#8b6572!important;font:10px/1.45 Georgia,serif!important}
 .pickupReady[hidden]{display:none}
-.pickupReady strong{color:#7a2948;font-weight:600}
+.pickupReady strong{color:#7a2948;font:inherit;font-weight:600}
 @media(max-width:420px){.deliveryLocationRow{grid-template-columns:1fr}.cartSummary{padding-inline:20px}}
