@@ -77,6 +77,7 @@ async function saveProduct(request, env, id) {
   return json({ ok: true });
 }
 async function uploadImage(request, env) {
+  if (!env.PRODUCT_IMAGES) return json({ error: 'La subida de fotos todavía no está activada.' }, 503);
   const file = (await request.formData()).get('image');
   const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
   if (!(file instanceof File) || !allowed.has(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) return json({ error: 'Sube una imagen JPG, PNG o WebP de hasta 5 MB.' }, 400);
@@ -86,6 +87,7 @@ async function uploadImage(request, env) {
   return json({ url: `/media/${key}` }, 201);
 }
 async function serveImage(pathname, env) {
+  if (!env.PRODUCT_IMAGES) return new Response('No encontrado', { status: 404 });
   const key = pathname.slice('/media/'.length);
   if (!key || key.includes('..')) return new Response('No encontrado', { status: 404 });
   const object = await env.PRODUCT_IMAGES.get(key);
