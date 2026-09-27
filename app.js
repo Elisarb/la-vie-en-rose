@@ -52,7 +52,7 @@ const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
 document.querySelector('#delivery-quote-status').insertAdjacentHTML('afterend', '<small class="map-credit">Ubicación con datos de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</small>');
-document.querySelector('[name="fulfillment"][value="pickup"]').closest('label').insertAdjacentHTML('afterend', '<div id="pickup-ready" class="pickupReady"><span>⌚</span><p>Tu pedido estará disponible para recoger aproximadamente en <strong>2 horas laborables</strong>.</p></div>');
+document.querySelector('[name="fulfillment"][value="pickup"]').closest('label').insertAdjacentHTML('afterend', '<p id="pickup-ready" class="pickupReady">Disponible para recoger aproximadamente en <strong>2 horas laborables</strong>.</p>');
 let toastTimer;
 let shopSettings = { pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
 let deliveryQuote = null;
