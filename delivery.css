@@ -1,7 +1,23 @@
-.deliveryQuoteRow{display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:6px}
-.deliveryQuoteRow input{min-width:0}
-.deliveryQuoteRow button{border:0;background:var(--berry);color:#fff;padding:0 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
-.deliveryQuoteRow button:disabled{opacity:.65;cursor:wait}
-#delivery-time-wrap>label:not(:first-child){margin-top:12px}
+#delivery-time-wrap{border:1px solid #eacbd5;border-radius:14px;padding:14px;background:linear-gradient(145deg,#fffafb,#fff1f5)}
+#delivery-time-wrap>label{font-size:12px;letter-spacing:.02em;margin:0 0 7px}
+#delivery-time-wrap input{width:100%;min-height:43px;border:1px solid #ddb9c5;border-radius:9px;background:#fff;padding:10px 11px;color:var(--ink);font-size:14px;outline:none}
+#delivery-time-wrap input:focus{border-color:var(--berry);box-shadow:0 0 0 3px #97174414}
+.deliveryLocationRow{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:9px;margin:10px 0}
+.deliveryLocationRow label{margin:0!important;color:#744556}
+#calculate-delivery{width:100%;border:0;border-radius:9px;background:var(--ink);color:#fff;padding:12px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+#calculate-delivery:disabled{opacity:.65;cursor:wait}
+.deliveryPricePreview{display:flex;align-items:center;justify-content:space-between;margin:11px 0 5px;padding:12px 13px;border-radius:10px;background:#f7d7e2;color:var(--berry)}
+.deliveryPricePreview[hidden]{display:none}
+.deliveryPricePreview span{font:italic 13px Georgia,serif}
+.deliveryPricePreview strong{font:25px 'Italiana',serif}
+#delivery-time-wrap>small{font-size:10px;line-height:1.45}
 .map-credit{opacity:.78}
-.map-credit a{color:inherit;text-underline-offset:2px}
+.map-credit a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.urgentDelivery{margin:12px 0!important;padding:10px 11px;border-left:3px solid var(--hot);background:#fff;font:11px/1.55 Georgia,serif;color:#6f4050!important}
+.urgentDelivery a{color:var(--berry);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+#delivery-time-wrap>label[for="delivery-time"]{margin-top:13px}
+.stripeEmailNote{display:flex!important;justify-content:flex-start!important;align-items:center;gap:9px;margin:0 0 14px;padding:10px 11px;border-radius:9px;background:var(--pale);color:#785360}
+.stripeEmailNote span{font-size:15px}
+.stripeEmailNote p{margin:0;font-size:10px;line-height:1.45}
+.cartSummary{max-height:68vh;overflow-y:auto}
+@media(max-width:420px){.deliveryLocationRow{grid-template-columns:1fr}.cartSummary{padding-inline:20px}}
