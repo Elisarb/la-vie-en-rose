@@ -52,6 +52,7 @@ const euro = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const productGrid = document.querySelector('#product-grid'), toast = document.querySelector('#toast'), drawer = document.querySelector('#cart'), overlay = document.querySelector('#cart-overlay');
 document.querySelector('#delivery-quote-status').insertAdjacentHTML('afterend', '<small class="map-credit">Ubicación con datos de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</small>');
+document.querySelector('[name="fulfillment"][value="pickup"]').closest('label').insertAdjacentHTML('afterend', '<div id="pickup-ready" class="pickupReady"><span>⌚</span><p>Tu pedido estará disponible para recoger aproximadamente en <strong>2 horas laborables</strong>.</p></div>');
 let toastTimer;
 let shopSettings = { pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
 let deliveryQuote = null;
@@ -101,6 +102,7 @@ async function loadShopSettings() {
     shopSettings = await response.json();
     document.querySelector('#delivery-time-help').textContent = `Mínimo ${formatDuration(shopSettings.deliveryLeadMinutes)} laborables · Horario 10:00–20:30`;
     document.querySelector('#urgent-delivery-note').firstChild.textContent = `¿Lo necesitas antes de ${formatDuration(shopSettings.deliveryLeadMinutes)}? `;
+    document.querySelector('#pickup-ready strong').textContent = `${formatDuration(shopSettings.pickupLeadMinutes)} laborables`;
     updateFulfillmentNote();
   } catch { /* Se mantienen valores seguros si el servicio no responde. */ }
 }
@@ -135,7 +137,7 @@ document.querySelector('#close-cart').addEventListener('click', closeCart);
 overlay.addEventListener('click', closeCart);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 document.querySelector('#whatsapp-order').addEventListener('click', () => whatsapp(orderMessage()));
-document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; if (delivery) document.querySelector('#delivery-time').min = localDateTime(earliestWorkingDelivery()); updateFulfillmentNote(); renderCart(); }));
+document.querySelectorAll('[name=fulfillment]').forEach(input => input.addEventListener('change', e => { fulfillment = e.target.value; const delivery = fulfillment === 'delivery'; document.querySelector('#delivery-time-wrap').hidden = !delivery; document.querySelector('#pickup-ready').hidden = delivery; if (delivery) document.querySelector('#delivery-time').min = localDateTime(earliestWorkingDelivery()); updateFulfillmentNote(); renderCart(); }));
 function resetDeliveryQuote() { deliveryQuote = null; document.querySelector('#delivery-choice-price').textContent = 'Según distancia'; document.querySelector('#delivery-price-preview').hidden = true; document.querySelector('#delivery-quote-status').textContent = 'Pulsa “Calcular precio del delivery” para obtener el importe.'; updateFulfillmentNote(); renderCart(); }
 document.querySelectorAll('#delivery-street, #delivery-locality, #delivery-postcode').forEach(input => input.addEventListener('input', resetDeliveryQuote));
 document.querySelector('#calculate-delivery').addEventListener('click', async () => {
