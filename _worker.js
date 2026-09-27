@@ -77,24 +77,20 @@ async function saveProduct(request, env, id) {
   return json({ ok: true });
 }
 async function uploadImage(request, env) {
-  if (!env.PRODUCT_IMAGES) return json({ error: 'La subida de fotos todavía no está activada.' }, 503);
   const file = (await request.formData()).get('image');
   const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-  if (!(file instanceof File) || !allowed.has(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) return json({ error: 'Sube una imagen JPG, PNG o WebP de hasta 5 MB.' }, 400);
+  if (!(file instanceof File) || !allowed.has(file.type) || file.size < 1 || file.size > 1.5 * 1024 * 1024) return json({ error: 'La foto debe ser JPG, PNG o WebP y ocupar menos de 1,5 MB.' }, 400);
   const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const key = `products/${crypto.randomUUID()}.${extension}`;
-  await env.PRODUCT_IMAGES.put(key, file.stream(), { httpMetadata: { contentType: file.type, cacheControl: 'public, max-age=31536000, immutable' } });
+  await env.DB.prepare('INSERT INTO product_images (image_key, content_type, image_data) VALUES (?, ?, ?)').bind(key, file.type, await file.arrayBuffer()).run();
   return json({ url: `/media/${key}` }, 201);
 }
 async function serveImage(pathname, env) {
-  if (!env.PRODUCT_IMAGES) return new Response('No encontrado', { status: 404 });
   const key = pathname.slice('/media/'.length);
   if (!key || key.includes('..')) return new Response('No encontrado', { status: 404 });
-  const object = await env.PRODUCT_IMAGES.get(key);
-  if (!object) return new Response('No encontrado', { status: 404 });
-  const headers = new Headers(); object.writeHttpMetadata(headers);
-  headers.set('etag', object.httpEtag); headers.set('cache-control', 'public, max-age=31536000, immutable');
-  return new Response(object.body, { headers });
+  const row = await env.DB.prepare('SELECT content_type, image_data FROM product_images WHERE image_key = ?').bind(key).first();
+  if (!row) return new Response('No encontrado', { status: 404 });
+  return new Response(row.image_data, { headers: { 'content-type': row.content_type, 'cache-control': 'public, max-age=31536000, immutable', etag: `"${key}"` } });
 }
 async function stripe(path, env, init = {}) {
   if (!env.STRIPE_SECRET_KEY) return json({ error: 'Stripe todavía no está configurado.' }, 503);
@@ -165,7 +161,12 @@ export default {
       if (url.pathname.startsWith('/api/admin/products/') && ['PUT', 'DELETE'].includes(request.method)) {
         const denied = await requireAdmin(request, env); if (denied) return denied;
         const id = decodeURIComponent(url.pathname.slice('/api/admin/products/'.length));
-        if (request.method === 'DELETE') { await env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run(); return json({ ok: true }); }
+        if (request.method === 'DELETE') {
+          const product = await env.DB.prepare('SELECT image_url FROM products WHERE id = ?').bind(id).first();
+          await env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+          if (product?.image_url?.startsWith('/media/')) await env.DB.prepare('DELETE FROM product_images WHERE image_key = ?').bind(product.image_url.slice('/media/'.length)).run();
+          return json({ ok: true });
+        }
         return saveProduct(request, env, id);
       }
       if (url.pathname === '/api/admin/upload' && request.method === 'POST') { const denied = await requireAdmin(request, env); if (denied) return denied; return uploadImage(request, env); }

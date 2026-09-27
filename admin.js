@@ -3,6 +3,19 @@ const euro = value => new Intl.NumberFormat('es-ES',{style:'currency',currency:'
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 let products = [];
 
+async function optimizeImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+  let quality = .84, blob;
+  do { blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality)); quality -= .08; } while (blob && blob.size > 1.35 * 1024 * 1024 && quality >= .44);
+  if (!blob || blob.size > 1.5 * 1024 * 1024) throw new Error('No pudimos reducir esta foto. Elige otra imagen.');
+  return new File([blob], 'producto.webp', { type: 'image/webp' });
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: options.body instanceof FormData ? options.headers : { 'content-type':'application/json', ...(options.headers || {}) } });
   const data = await response.json().catch(() => ({}));
@@ -42,7 +55,7 @@ $('#product-form').addEventListener('submit', async event => {
   event.preventDefault(); const save=$('#save-product'); save.disabled=true; save.textContent='Guardando…';
   try {
     let image=$('#image-url').value; const file=$('#image-file').files[0];
-    if(file){ const form=new FormData(); form.append('image',file); image=(await api('/api/admin/upload',{method:'POST',body:form})).url; }
+    if(file){ save.textContent='Preparando foto…'; const form=new FormData(); form.append('image',await optimizeImage(file)); save.textContent='Subiendo foto…'; image=(await api('/api/admin/upload',{method:'POST',body:form})).url; }
     const payload={name:$('#name').value,price:$('#price').value,category:$('#category').value,description:$('#description').value,badge:$('#badge').value,sortOrder:$('#sort-order').value,image,active:$('#active').checked};
     const id=$('#product-id').value; await api(id?`/api/admin/products/${encodeURIComponent(id)}`:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});
     $('#editor').close(); await loadProducts(); notify(id?'Producto actualizado.':'Producto añadido.');
