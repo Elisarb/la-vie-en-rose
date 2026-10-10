@@ -210,8 +210,13 @@ async function createCheckout(request, env) {
   items.forEach((item, index) => {
     const product = products.get(String(item.id || '')), quantity = Number(item.quantity);
     if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 10) throw new Error('INVALID_CART');
+    form.set(`payment_intent_data[metadata][product_${index + 1}]`, `${quantity} × ${product.name}`);
     form.set(`line_items[${index}][price_data][currency]`, 'eur'); form.set(`line_items[${index}][price_data][unit_amount]`, String(product.price_cents)); form.set(`line_items[${index}][price_data][product_data][name]`, product.name); form.set(`line_items[${index}][quantity]`, String(quantity));
   });
+  const orderItems = items.map(item => `${Number(item.quantity)} × ${products.get(String(item.id)).name}`).join(' · ');
+  const referencePrefix = `Pedido ${orderRef} · `;
+  const summary = orderItems.length > 900 - referencePrefix.length ? `${orderItems.slice(0, 899 - referencePrefix.length)}…` : orderItems;
+  form.set('payment_intent_data[description]', `${referencePrefix}${summary}`);
   const response = await stripe('/v1/checkout/sessions', env, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form });
   const result = await response.json();
   if (!response.ok || !result.url) return json({ error: result.error?.message || 'No se pudo iniciar el pago.' }, 502);
