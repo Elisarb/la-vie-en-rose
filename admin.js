@@ -2,6 +2,18 @@ const $ = selector => document.querySelector(selector);
 const euro = value => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(value);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 let products = [], settings = null;
+const weekNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+function hoursRow(day, index, date = '') {
+  return `<div class="hours-row" data-day="${index}">${date ? `<label>Fecha<input type="date" class="hours-date" value="${date}" required></label>` : `<span>${weekNames[index]}</span>`}<label>Apertura<input type="time" class="hours-open" value="${day.open}" required></label><label>Cierre<input type="time" class="hours-close" value="${day.close}" required></label><label><input type="checkbox" class="hours-closed" ${day.closed ? 'checked' : ''}> Cerrado</label>${date ? '<button type="button" class="quiet remove-hours">Quitar</button>' : ''}</div>`;
+}
+function readHours() {
+  const read = row => ({ open: row.querySelector('.hours-open').value, close: row.querySelector('.hours-close').value, closed: row.querySelector('.hours-closed').checked });
+  const week = [...$('#weekly-hours').children].map(read), dates = {};
+  for (const row of $('#date-hours').children) { const date = row.querySelector('.hours-date').value; if (dates[date]) throw new Error('Hay dos excepciones para la misma fecha.'); dates[date] = read(row); }
+  return { week, dates };
+}
+$('#add-hours-date').addEventListener('click', () => { const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(new Date()); $('#date-hours').insertAdjacentHTML('beforeend', hoursRow({open:'10:00',close:'20:30',closed:false}, '', date)); });
+$('#date-hours').addEventListener('click', event => { if (event.target.closest('.remove-hours')) event.target.closest('.hours-row').remove(); });
 
 async function optimizeImage(file) {
   const bitmap = await createImageBitmap(file);
@@ -32,12 +44,15 @@ function render() {
   $('#available-count').textContent = `${products.filter(p => p.active).length} disponibles en la tienda`;
   $('#product-list').innerHTML = products.length ? products.map(p => `<article class="product-row" data-id="${escapeHtml(p.id)}"><img src="${escapeHtml(p.image)}" alt=""><div class="product-copy"><h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.description)}</p></div><div class="price">${euro(p.price)}</div><div class="category">${escapeHtml(p.category)}</div><div class="availability ${p.active?'':'unavailable'}"><span class="dot"></span>${p.active?'Disponible':'Pausado'}</div><button class="quiet edit">Editar</button></article>`).join('') : '<div class="empty">Aún no hay productos.</div>';
 }
-async function loadProducts() { products = await api('/api/admin/products'); render(); }
+async function loadProducts() { products = (await api('/api/admin/products')).map(product => ({...product, image: product.image.startsWith('/media/') ? `${product.image}?v=2` : product.image})); render(); }
 async function loadSettings() {
   settings = await api('/api/admin/settings');
   $('#store-address').value = settings.storeAddress || '';
   $('#pickup-lead').value = settings.pickupLeadMinutes;
   $('#delivery-lead').value = settings.deliveryLeadMinutes;
+  const hours = settings.hours || { week: weekNames.map(() => ({open:'10:00',close:'20:30',closed:false})), dates: {} };
+  $('#weekly-hours').innerHTML = hours.week.map((day, index) => hoursRow(day, index)).join('');
+  $('#date-hours').innerHTML = Object.entries(hours.dates).sort().map(([date, day]) => hoursRow(day, '', date)).join('');
   $('#resolved-address').textContent = settings.storeLat == null ? 'Añade la dirección exacta para activar el cálculo del delivery.' : 'Dirección localizada correctamente. Puedes cambiarla cuando sea necesario.';
 }
 async function showDashboard() { $('#login-view').hidden = true; $('#dashboard').hidden = false; await Promise.all([loadProducts(), loadSettings()]); }
@@ -59,7 +74,7 @@ $('#new-product').addEventListener('click', () => openEditor());
 $('#settings-form').addEventListener('submit', async event => {
   event.preventDefault(); const button=$('#save-settings'); button.disabled=true; button.textContent='Localizando…';
   try {
-    const result=await api('/api/admin/settings',{method:'PUT',body:JSON.stringify({storeAddress:$('#store-address').value,pickupLeadMinutes:$('#pickup-lead').value,deliveryLeadMinutes:$('#delivery-lead').value})});
+    const result=await api('/api/admin/settings',{method:'PUT',body:JSON.stringify({storeAddress:$('#store-address').value,pickupLeadMinutes:$('#pickup-lead').value,deliveryLeadMinutes:$('#delivery-lead').value,hours:readHours()})});
     settings=result.settings; $('#resolved-address').textContent=`Ubicación reconocida: ${result.resolvedAddress}`; notify('Ajustes de pedidos actualizados.');
   } catch(error){ notify(error.message,true); } finally { button.disabled=false; button.textContent='Guardar ajustes'; }
 });
@@ -68,7 +83,7 @@ document.querySelectorAll('[data-close]').forEach(button => button.addEventListe
 $('#product-form').addEventListener('submit', async event => {
   event.preventDefault(); const save=$('#save-product'); save.disabled=true; save.textContent='Guardando…';
   try {
-    let image=$('#image-url').value; const file=$('#image-file').files[0];
+    let image=$('#image-url').value.replace(/\?v=2$/, ''); const file=$('#image-file').files[0];
     if(file){ save.textContent='Preparando foto…'; const form=new FormData(); form.append('image',await optimizeImage(file)); save.textContent='Subiendo foto…'; image=(await api('/api/admin/upload',{method:'POST',body:form})).url; }
     const payload={name:$('#name').value,price:$('#price').value,category:$('#category').value,description:$('#description').value,badge:$('#badge').value,sortOrder:$('#sort-order').value,image,active:$('#active').checked};
     const id=$('#product-id').value; await api(id?`/api/admin/products/${encodeURIComponent(id)}`:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});

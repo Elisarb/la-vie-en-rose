@@ -58,20 +58,9 @@ let shopSettings = { pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
 let deliveryQuote = null;
 let fulfillment = 'pickup';
 
+import { workingReady, isWorking } from './hours.js';
 function earliestWorkingDelivery(from = new Date(), leadMinutes = shopSettings.deliveryLeadMinutes) {
-  const cursor = new Date(from);
-  cursor.setSeconds(0, 0);
-  cursor.setMinutes(cursor.getMinutes() + 1);
-  let remaining = leadMinutes;
-  while (remaining > 0) {
-    const minutes = cursor.getHours() * 60 + cursor.getMinutes();
-    if (minutes < 10 * 60) cursor.setHours(10, 0, 0, 0);
-    else if (minutes >= 20 * 60 + 30) { cursor.setDate(cursor.getDate() + 1); cursor.setHours(10, 0, 0, 0); }
-    else { cursor.setMinutes(cursor.getMinutes() + 1); remaining -= 1; }
-  }
-  cursor.setMinutes(Math.ceil(cursor.getMinutes() / 30) * 30, 0, 0);
-  if (cursor.getHours() * 60 + cursor.getMinutes() > 20 * 60 + 30) { cursor.setDate(cursor.getDate() + 1); cursor.setHours(10, 0, 0, 0); }
-  return cursor;
+  return workingReady(from, leadMinutes, shopSettings.hours);
 }
 
 function localDateTime(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; }
@@ -86,7 +75,7 @@ async function loadCatalog() {
     const response = await fetch('/api/products', { headers: { accept: 'application/json' } });
     const catalog = await response.json();
     if (!response.ok || !Array.isArray(catalog)) throw new Error('CATALOG_UNAVAILABLE');
-    products = catalog;
+    products = catalog.map(product => ({ ...product, image: product.image.startsWith('/media/') ? `${product.image}?v=2` : product.image }));
     Object.keys(cart).forEach(id => { if (!products.some(product => product.id === id)) delete cart[id]; });
     localStorage.setItem('lavie-cart', JSON.stringify(cart));
     renderProducts();
@@ -100,7 +89,7 @@ async function loadShopSettings() {
     const response = await fetch('/api/settings', { headers: { accept: 'application/json' } });
     if (!response.ok) return;
     shopSettings = await response.json();
-    document.querySelector('#delivery-time-help').textContent = `Mínimo ${formatDuration(shopSettings.deliveryLeadMinutes)} laborables · Horario 10:00–20:30`;
+    document.querySelector('#delivery-time-help').textContent = `Mínimo ${formatDuration(shopSettings.deliveryLeadMinutes)} laborables · Según el horario de apertura de cada día (Madrid)`;
     document.querySelector('#urgent-delivery-note').firstChild.textContent = `¿Lo necesitas antes de ${formatDuration(shopSettings.deliveryLeadMinutes)}? `;
     document.querySelector('#pickup-ready strong').textContent = `${formatDuration(shopSettings.pickupLeadMinutes)} laborables`;
     updateFulfillmentNote();
@@ -113,7 +102,11 @@ function formatDuration(minutes) {
 }
 function updateFulfillmentNote() {
   const note = document.querySelector('#delivery-note');
-  if (fulfillment === 'pickup') note.textContent = `Recogida gratuita. Preparado aproximadamente en ${formatDuration(shopSettings.pickupLeadMinutes)} laborables.`;
+  if (fulfillment === 'pickup') {
+    const ready = earliestWorkingDelivery(new Date(), shopSettings.pickupLeadMinutes);
+    const estimate = new Intl.DateTimeFormat('es-ES', {timeZone:'Europe/Madrid',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(ready);
+    note.textContent = `Recogida gratuita. Disponible aproximadamente el ${estimate} (hora de Madrid).`;
+  }
   else if (deliveryQuote) note.textContent = `Delivery ${euro(deliveryQuote.fee)} · distancia estimada ${deliveryQuote.distanceKm} km.`;
   else note.textContent = 'Introduce la dirección para calcular el delivery.';
 }

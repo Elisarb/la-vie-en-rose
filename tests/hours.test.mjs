@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { defaultHours, validateHours, workingReady, isWorking } from '../hours.js';
+const hours = defaultHours();
+assert.equal(workingReady(new Date('2026-10-10T08:00:00Z'), 120, hours).toISOString(), '2026-10-10T10:00:00.000Z');
+assert.equal(workingReady(new Date('2026-10-10T16:30:00Z'), 300, hours).toISOString(), '2026-10-11T11:00:00.000Z');
+hours.dates['2026-10-11'] = { open: '10:00', close: '20:30', closed: true };
+assert.equal(workingReady(new Date('2026-10-10T16:30:00Z'), 300, hours).toISOString(), '2026-10-12T11:00:00.000Z');
+assert.equal(isWorking(new Date('2026-10-11T10:00:00Z'), hours), false);
+hours.week[1] = { open: '12:00', close: '18:00', closed: false };
+assert.equal(workingReady(new Date('2026-10-10T16:30:00Z'), 300, hours).toISOString(), '2026-10-12T13:00:00.000Z');
+assert.equal(workingReady(new Date('2026-10-12T17:00:00Z'), 0, hours).toISOString(), '2026-10-13T08:00:00.000Z');
+assert.equal(workingReady(new Date('2026-10-25T09:00:00Z'), 120, defaultHours()).toISOString(), '2026-10-25T11:00:00.000Z');
+assert.throws(() => validateHours({ week: Array(7).fill({closed:true,open:'10:00',close:'20:30'}), dates:{} }), /INVALID_HOURS/);
+console.log('Horarios: preparación, cierre, excepciones, cero minutos y cambio de hora verificados.');

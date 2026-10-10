@@ -28,12 +28,13 @@
         <div class="top-actions"><a href="/" target="_blank">Ver tienda ↗</a><button id="logout" class="quiet">Salir</button></div>
       </header>
       <form id="settings-form" class="settings-card">
-        <div class="settings-heading"><div><p class="eyebrow">Pedidos y entregas</p><h2>Preparación y delivery</h2><p>Estos tiempos se cuentan dentro del horario de 10:00 a 20:30.</p></div><button id="save-settings" type="submit">Guardar ajustes</button></div>
+        <div class="settings-heading"><div><p class="eyebrow">Pedidos y entregas</p><h2>Preparación y delivery</h2><p>Los tiempos se cuentan únicamente dentro de los horarios que configures. Zona horaria: Madrid.</p></div><button id="save-settings" type="submit">Guardar ajustes</button></div>
         <div class="settings-grid">
           <label class="address-field">Dirección de la floristería<input id="store-address" maxlength="220" placeholder="Calle, número, código postal, Madrid" required><small id="resolved-address">Se usa como punto de partida para calcular el delivery.</small></label>
           <label>Recogida disponible después de<input id="pickup-lead" type="number" min="0" max="2880" step="15" required><span class="field-suffix">minutos laborables</span></label>
           <label>Entrega disponible después de<input id="delivery-lead" type="number" min="0" max="2880" step="15" required><span class="field-suffix">minutos laborables</span></label>
         </div>
+        <details><summary>Horarios de trabajo</summary><p>Semana habitual. Para un día especial, añade una excepción por fecha.</p><div id="weekly-hours"></div><h3>Excepciones por fecha</h3><div id="date-hours"></div><button id="add-hours-date" type="button" class="quiet">Añadir fecha especial</button></details>
         <details><summary>Ver tarifas de delivery</summary><div class="rate-grid"><span>0–5 km <b>6,05 €</b></span><span>5–10 km <b>10,89 €</b></span><span>10–15 km <b>15,97 €</b></span><span>15–20 km <b>21,05 €</b></span><span>Más de 20 km <b>1,10 €/km</b></span></div></details>
       </form>
       <div class="toolbar">

@@ -1,3 +1,4 @@
+import { defaultHours, validateHours, isWorking, workingReady } from './hours.js';
 const json = (data, status = 200, extra = {}) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra }
 });
@@ -90,7 +91,9 @@ async function serveImage(pathname, env) {
   if (!key || key.includes('..')) return new Response('No encontrado', { status: 404 });
   const row = await env.DB.prepare('SELECT content_type, image_data FROM product_images WHERE image_key = ?').bind(key).first();
   if (!row) return new Response('No encontrado', { status: 404 });
-  return new Response(row.image_data, { headers: { 'content-type': row.content_type, 'cache-control': 'public, max-age=31536000, immutable', etag: `"${key}"` } });
+  const bytes = Array.isArray(row.image_data) ? new Uint8Array(row.image_data) : row.image_data;
+  if (!bytes || (bytes.byteLength ?? bytes.length) === 0) return new Response('Foto vacía; vuelve a subirla desde el panel.', { status: 404 });
+  return new Response(bytes, { headers: { 'content-type': row.content_type, 'cache-control': 'public, max-age=3600', etag: `"v2-${key}"` } });
 }
 const defaultSettings = { storeAddress: '', storeLat: null, storeLng: null, pickupLeadMinutes: 60, deliveryLeadMinutes: 300 };
 function publicSettings(row) {
@@ -98,7 +101,9 @@ function publicSettings(row) {
   return { storeAddress: row.store_address || '', storeLat: row.store_lat, storeLng: row.store_lng, pickupLeadMinutes: row.pickup_lead_minutes, deliveryLeadMinutes: row.delivery_lead_minutes };
 }
 async function getSettings(env) {
-  return publicSettings(await env.DB.prepare('SELECT store_address, store_lat, store_lng, pickup_lead_minutes, delivery_lead_minutes FROM shop_settings WHERE id = 1').first());
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS shop_hours (id INTEGER PRIMARY KEY, hours_json TEXT NOT NULL)').run();
+  const row = await env.DB.prepare('SELECT hours_json FROM shop_hours WHERE id = 1').first();
+  return { ...publicSettings(await env.DB.prepare('SELECT store_address, store_lat, store_lng, pickup_lead_minutes, delivery_lead_minutes FROM shop_settings WHERE id = 1').first()), hours: row ? JSON.parse(row.hours_json) : defaultHours() };
 }
 function normalizeAddress(value) { return safeText(value, 220).replace(/\s+/g, ' ').trim(); }
 async function geocodeAddress(address, env) {
@@ -154,6 +159,9 @@ async function saveSettings(request, env) {
   const storeAddress = normalizeAddress(body.storeAddress), pickupLeadMinutes = Number.parseInt(body.pickupLeadMinutes, 10), deliveryLeadMinutes = Number.parseInt(body.deliveryLeadMinutes, 10);
   if (storeAddress.length < 8 || !Number.isInteger(pickupLeadMinutes) || pickupLeadMinutes < 0 || pickupLeadMinutes > 2880 || !Number.isInteger(deliveryLeadMinutes) || deliveryLeadMinutes < 0 || deliveryLeadMinutes > 2880) return json({ error: 'Introduce una dirección y tiempos entre 0 y 2.880 minutos.' }, 400);
   const location = await geocodeAddress(storeAddress, env);
+  const currentSettings = await getSettings(env);
+  const hours = validateHours(body.hours || currentSettings.hours);
+  await env.DB.prepare('INSERT INTO shop_hours (id, hours_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET hours_json=excluded.hours_json').bind(JSON.stringify(hours)).run();
   await env.DB.prepare('INSERT INTO shop_settings (id, store_address, store_lat, store_lng, pickup_lead_minutes, delivery_lead_minutes, updated_at) VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET store_address=excluded.store_address, store_lat=excluded.store_lat, store_lng=excluded.store_lng, pickup_lead_minutes=excluded.pickup_lead_minutes, delivery_lead_minutes=excluded.delivery_lead_minutes, updated_at=CURRENT_TIMESTAMP').bind(storeAddress, location.lat, location.lng, pickupLeadMinutes, deliveryLeadMinutes).run();
   return json({ ok: true, settings: await getSettings(env), resolvedAddress: location.address });
 }
@@ -183,9 +191,9 @@ async function createCheckout(request, env) {
     deliveryQuote = await verifyDeliveryQuote(payload.deliveryQuoteToken, env);
     if (!deliveryQuote) return json({ error: 'Calcula de nuevo el envío antes de pagar.' }, 400);
     const requested = new Date(payload.deliveryAt);
-    if (Number.isNaN(requested.getTime()) || requested.getTime() < earliestWorkingDelivery(new Date(), settings.deliveryLeadMinutes).getTime()) return json({ error: `La entrega requiere al menos ${settings.deliveryLeadMinutes} minutos laborables de preparación.` }, 400);
+    if (Number.isNaN(requested.getTime()) || requested.getTime() < workingReady(new Date(), settings.deliveryLeadMinutes, settings.hours).getTime()) return json({ error: `La entrega requiere al menos ${settings.deliveryLeadMinutes} minutos laborables de preparación.` }, 400);
     const clock = madridClockMinutes(requested);
-    if (clock < 600 || clock > 1230) return json({ error: 'La hora de entrega debe estar entre las 10:00 y las 20:30.' }, 400);
+    if (!isWorking(requested, settings.hours, true)) return json({ error: 'Elige una fecha y hora dentro del horario de apertura de ese día.' }, 400);
     deliveryAt = requested.toISOString();
   }
   const rows = await env.DB.batch(items.map(item => env.DB.prepare('SELECT id, name, price_cents FROM products WHERE id = ? AND active = 1').bind(String(item.id || ''))));
@@ -249,6 +257,7 @@ export default {
       if (url.pathname === '/api/checkout/success' && request.method === 'GET') return confirmCheckout(url, env);
     } catch (error) {
       console.error(error);
+      if (error?.message === 'INVALID_HOURS') return json({ error: 'Revisa los horarios: apertura anterior al cierre y al menos un día semanal abierto.' }, 400);
       if (error?.message === 'INVALID_CART') return json({ error: 'Algún producto ya no está disponible. Actualiza la página y revisa la cesta.' }, 400);
       if (error?.message === 'INVALID_ADDRESS') return json({ error: 'Escribe una dirección completa con calle, número, código postal y localidad.' }, 400);
       if (error?.message === 'ADDRESS_NOT_FOUND') return json({ error: 'No hemos podido localizar esa dirección. Revisa la calle, el número y el código postal.' }, 400);
