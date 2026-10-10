@@ -27,6 +27,14 @@
         <div><p class="eyebrow">La Vie en Rose</p><h1>Gestión de la tienda</h1><p>Los cambios aparecen inmediatamente en la tienda.</p></div>
         <div class="top-actions"><a href="/" target="_blank">Ver tienda ↗</a><button id="logout" class="quiet">Salir</button></div>
       </header>
+      <nav class="admin-nav" aria-label="Gestión"><a href="#orders-panel">Pedidos</a><a href="#product-list">Catálogo</a><a href="#settings-form">Configuración</a></nav>
+      <section id="orders-panel" class="settings-card">
+        <div class="settings-heading"><div><p class="eyebrow">El taller de hoy</p><h2>Pedidos <span id="new-orders-count"></span></h2><p id="orders-summary" aria-live="polite"></p></div><button id="refresh-orders" type="button" class="quiet">Actualizar</button></div>
+        <p id="webhook-warning" class="error" hidden>Falta activar el webhook de Stripe. Sin él, un pedido podría no aparecer si el cliente cierra el navegador después de pagar.</p>
+        <div class="order-tools"><label>Mostrar<select id="order-filter"><option value="all">Todos</option><option value="pending">Pendientes</option><option value="preparing">En preparación</option><option value="ready">Listos</option><option value="delivered">Entregados</option></select></label><label><input id="order-sound" type="checkbox"> Sonido para nuevos pedidos (panel abierto)</label></div>
+        <p id="orders-error" class="error" role="alert"></p><div id="orders-list"></div>
+        <details><summary>Recuperar una compra anterior</summary><p>Pega el identificador de sesión de Checkout (cs_live_…). Verificaremos el pago en Stripe antes de añadirlo.</p><form id="import-order"><label>Sesión de Checkout<input id="import-session" required pattern="cs_(live_|test_)[A-Za-z0-9]+"></label><button>Recuperar pedido</button></form></details>
+      </section>
       <form id="settings-form" class="settings-card">
         <div class="settings-heading"><div><p class="eyebrow">Pedidos y entregas</p><h2>Preparación y delivery</h2><p>Los tiempos se cuentan únicamente dentro de los horarios que configures. Zona horaria: Madrid.</p></div><button id="save-settings" type="submit">Guardar ajustes</button></div>
         <div class="settings-grid">

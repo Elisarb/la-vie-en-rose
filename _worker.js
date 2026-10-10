@@ -1,4 +1,5 @@
 import { defaultHours, validateHours, isWorking, workingReady } from './hours.js';
+import { orderWebhook, recordOrder, listOrders, ensureOrders } from './orders.js';
 const json = (data, status = 200, extra = {}) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra }
 });
@@ -229,12 +230,27 @@ async function confirmCheckout(url, env) {
   if (!response.ok) return Response.redirect(`${url.origin}/?checkout=cancelled`, 303);
   const session = await response.json();
   const state = session.status === 'complete' && session.payment_status === 'paid' ? 'success' : 'cancelled';
+  if (state === 'success') await recordOrder(sessionId, env, stripe);
   return Response.redirect(`${url.origin}/?checkout=${state}&ref=${encodeURIComponent(session.client_reference_id || 'Confirmado')}`, 303);
 }
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      if (url.pathname === '/api/stripe/webhook' && request.method === 'POST') return await orderWebhook(request, env, stripe);
+      if (url.pathname === '/api/admin/orders' && request.method === 'GET') { const denied = await requireAdmin(request, env); if (denied) return denied; return json({ orders: await listOrders(env), webhookConfigured: Boolean(env.STRIPE_WEBHOOK_SECRET) }); }
+      if (url.pathname === '/api/admin/orders/import' && request.method === 'POST') {
+        const denied = await requireAdmin(request, env); if (denied) return denied;
+        const body = await request.json(); return json({ok:await recordOrder(String(body.sessionId || ''),env,stripe)});
+      }
+      if (url.pathname.startsWith('/api/admin/orders/') && request.method === 'PUT') {
+        const denied = await requireAdmin(request, env); if (denied) return denied;
+        const body = await request.json();
+        if (!['pending','preparing','ready','delivered'].includes(body.status)) return json({error:'Estado no válido.'},400);
+        await ensureOrders(env);
+        const result = await env.DB.prepare('UPDATE orders SET status=?, updated_at=CURRENT_TIMESTAMP WHERE session_id=?').bind(body.status,decodeURIComponent(url.pathname.slice('/api/admin/orders/'.length))).run();
+        return json({ok:Boolean(result.meta.changes)},result.meta.changes?200:404);
+      }
       if (url.pathname === '/api/products' && request.method === 'GET') return json(await listProducts(env));
       if (url.pathname === '/api/settings' && request.method === 'GET') return json(await getSettings(env));
       if (url.pathname === '/api/delivery/quote' && request.method === 'POST') return quoteDelivery(request, env);

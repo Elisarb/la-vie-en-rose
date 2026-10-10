@@ -55,7 +55,7 @@ async function loadSettings() {
   $('#date-hours').innerHTML = Object.entries(hours.dates).sort().map(([date, day]) => hoursRow(day, '', date)).join('');
   $('#resolved-address').textContent = settings.storeLat == null ? 'Añade la dirección exacta para activar el cálculo del delivery.' : 'Dirección localizada correctamente. Puedes cambiarla cuando sea necesario.';
 }
-async function showDashboard() { $('#login-view').hidden = true; $('#dashboard').hidden = false; await Promise.all([loadProducts(), loadSettings()]); }
+async function showDashboard() { $('#login-view').hidden = true; $('#dashboard').hidden = false; await Promise.all([loadProducts(), loadSettings(), loadOrders()]); }
 function openEditor(product) {
   $('#dialog-title').textContent = product ? 'Editar producto' : 'Nuevo producto';
   $('#product-id').value = product?.id || ''; $('#name').value = product?.name || ''; $('#price').value = product?.price ?? '';
@@ -97,3 +97,44 @@ $('#delete-product').addEventListener('click', async () => {
 });
 
 (async()=>{ try{ const session=await api('/api/admin/session'); if(session.authenticated) await showDashboard(); else $('#login-view').hidden=false; }catch{ $('#login-view').hidden=false; $('#login-error').textContent='No se pudo conectar con el panel.'; } })();
+
+let orders = [], knownOrders = null, audioContext = null, loadingOrders = false;
+const orderStates = {pending:'Pendiente',preparing:'En preparación',ready:'Listo',delivered:'Entregado'};
+const orderDate = value => value ? new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'medium',timeStyle:'short'}).format(new Date(value)) : 'Sin fecha';
+function renderOrders() {
+  const pending = orders.filter(o=>o.status==='pending').length;
+  $('#new-orders-count').textContent = pending ? `· ${pending} nuevos` : '';
+  const today = new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Madrid'}).format(new Date());
+  const deliveries = orders.filter(o=>o.deliveryAt && new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Madrid'}).format(new Date(o.deliveryAt))===today && o.status!=='delivered').length;
+  $('#orders-summary').textContent = `${pending} pendientes · ${deliveries} entregas previstas hoy · ${orders.length} pedidos registrados (máximo 500 recientes)`;
+  const filter = $('#order-filter').value;
+  $('#orders-list').innerHTML = orders.filter(o=>filter==='all'||o.status===filter).map(o=>{
+    const phone = String(o.customer.phone || '').replace(/\D/g,'');
+    const address = o.shipping?.address;
+    const fullAddress = address ? [address.line1,address.line2,address.postal_code,address.city,address.state].filter(Boolean).join(', ') : o.address;
+    return `<article class="order-card" data-order="${escapeHtml(o.id)}"><header><div><p class="eyebrow">${o.live?'Pago confirmado':'Prueba · no preparar'}</p><h3>${escapeHtml(o.ref)}</h3><small>Creado: ${orderDate(o.created*1000)}</small></div><strong>${euro(o.total/100)}</strong></header><ul>${o.items.map(i=>`<li>${i.quantity} × ${escapeHtml(i.name)} <span>${euro(i.total/100)}</span></li>`).join('')}</ul><p><strong>${o.fulfillment==='delivery'?'Entrega a domicilio':'Recogida en tienda'}</strong>${o.deliveryAt?` · Aproximada: ${orderDate(o.deliveryAt)}`:` · Preparación: ${o.pickupLeadMinutes} minutos laborables`}</p>${fullAddress?`<p>Dirección: ${escapeHtml(fullAddress)}</p>`:''}<p>Cliente: ${escapeHtml(o.customer.name||'—')} · ${escapeHtml(o.customer.email||'—')} · ${escapeHtml(o.customer.phone||'—')}</p><p>Destinatario: ${escapeHtml(o.recipient||'—')}</p>${o.dedication?`<blockquote>${escapeHtml(o.dedication)}</blockquote>`:''}<footer><label>Estado<select class="order-status">${Object.entries(orderStates).map(([value,label])=>`<option value="${value}" ${o.status===value?'selected':''}>${label}</option>`).join('')}</select></label>${phone?`<a target="_blank" rel="noopener" href="https://wa.me/${phone}?text=${encodeURIComponent(`Hola, te escribimos de La Vie en Rose sobre tu pedido ${o.ref}.`)}">WhatsApp</a>`:''}<button type="button" class="quiet print-order">Imprimir ficha</button></footer></article>`;
+  }).join('') || '<p class="empty">No hay pedidos en este apartado.</p>';
+}
+async function loadOrders() {
+  if(loadingOrders) return; loadingOrders=true;
+  try {
+    const result = await api('/api/admin/orders');
+    const fresh = knownOrders && result.orders.some(o=>!knownOrders.has(o.id));
+    orders=result.orders; knownOrders=new Set(orders.map(o=>o.id));
+    $('#webhook-warning').hidden=result.webhookConfigured;
+    $('#orders-error').textContent=''; renderOrders();
+    if(fresh) {notify('Ha llegado un nuevo pedido.'); if($('#order-sound').checked && audioContext) {const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();gain.gain.value=.08;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();oscillator.stop(audioContext.currentTime+.25);} }
+  } catch(error){$('#orders-error').textContent=`No se pudieron actualizar los pedidos: ${error.message}`;} finally{loadingOrders=false;}
+}
+$('#refresh-orders').addEventListener('click',loadOrders);
+$('#order-filter').addEventListener('change',renderOrders);
+$('#order-sound').addEventListener('change',async()=>{if($('#order-sound').checked){audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); await audioContext.resume();}});
+$('#orders-list').addEventListener('change',async event=>{
+  if(!event.target.matches('.order-status'))return;
+  const select=event.target, id=select.closest('[data-order]').dataset.order; select.disabled=true;
+  try{await api(`/api/admin/orders/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({status:select.value})}); await loadOrders(); notify('Estado actualizado.');}catch(error){notify(error.message,true);renderOrders();}finally{select.disabled=false;}
+});
+$('#orders-list').addEventListener('click',event=>{if(event.target.closest('.print-order')){const card=event.target.closest('.order-card');card.classList.add('printing');window.print();card.classList.remove('printing');}});
+$('#import-order').addEventListener('submit',async event=>{event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;try{const result=await api('/api/admin/orders/import',{method:'POST',body:JSON.stringify({sessionId:$('#import-session').value.trim()})});notify(result.ok?'Pedido recuperado.':'La sesión no es un pedido pagado de esta tienda.',!result.ok);await loadOrders();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
+setInterval(()=>{if(!$('#dashboard').hidden && !document.hidden)loadOrders();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!$('#dashboard').hidden)loadOrders();});
