@@ -10,7 +10,7 @@ function readHours() {
   const read = row => ({ open: row.querySelector('.hours-open').value, close: row.querySelector('.hours-close').value, closed: row.querySelector('.hours-closed').checked });
   const week = [...$('#weekly-hours').children].map(read), dates = {};
   for (const row of $('#date-hours').children) { const date = row.querySelector('.hours-date').value; if (dates[date]) throw new Error('Hay dos excepciones para la misma fecha.'); dates[date] = read(row); }
-  return { week, dates };
+  return { week, dates, deliverySlots:[...document.querySelectorAll('.slot-start')].map((input,i)=>({start:input.value,end:document.querySelectorAll('.slot-end')[i].value})) };
 }
 $('#add-hours-date').addEventListener('click', () => { const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(new Date()); $('#date-hours').insertAdjacentHTML('beforeend', hoursRow({open:'10:00',close:'20:30',closed:false}, '', date)); });
 $('#date-hours').addEventListener('click', event => { if (event.target.closest('.remove-hours')) event.target.closest('.hours-row').remove(); });
@@ -50,6 +50,9 @@ async function loadSettings() {
   $('#store-address').value = settings.storeAddress || '';
   $('#pickup-lead').value = settings.pickupLeadMinutes;
   $('#delivery-lead').value = settings.deliveryLeadMinutes;
+  const slots=settings.hours?.deliverySlots||[{start:'10:00',end:'13:00'},{start:'13:00',end:'17:00'},{start:'17:00',end:'20:30'}];
+  document.querySelectorAll('.slot-start').forEach((input,i)=>input.value=slots[i].start);
+  document.querySelectorAll('.slot-end').forEach((input,i)=>input.value=slots[i].end);
   const hours = settings.hours || { week: weekNames.map(() => ({open:'10:00',close:'20:30',closed:false})), dates: {} };
   $('#weekly-hours').innerHTML = hours.week.map((day, index) => hoursRow(day, index)).join('');
   $('#date-hours').innerHTML = Object.entries(hours.dates).sort().map(([date, day]) => hoursRow(day, '', date)).join('');
@@ -114,6 +117,7 @@ function renderOrders() {
     const fullAddress = address ? [address.line1,address.line2,address.postal_code,address.city,address.state].filter(Boolean).join(', ') : o.address;
     return `<article class="order-card" data-order="${escapeHtml(o.id)}"><header><div><p class="eyebrow">${o.live?'Pago confirmado':'Prueba · no preparar'}</p><h3>${escapeHtml(o.ref)}</h3><small>Creado: ${orderDate(o.created*1000)}</small></div><strong>${euro(o.total/100)}</strong></header><ul>${o.items.map(i=>`<li>${i.quantity} × ${escapeHtml(i.name)} <span>${euro(i.total/100)}</span></li>`).join('')}</ul><p><strong>${o.fulfillment==='delivery'?'Entrega a domicilio':'Recogida en tienda'}</strong>${o.deliveryAt?` · Aproximada: ${orderDate(o.deliveryAt)}`:` · Preparación: ${o.pickupLeadMinutes} minutos laborables`}</p>${fullAddress?`<p>Dirección: ${escapeHtml(fullAddress)}</p>`:''}<p>Cliente: ${escapeHtml(o.customer.name||'—')} · ${escapeHtml(o.customer.email||'—')} · ${escapeHtml(o.customer.phone||'—')}</p><p>Destinatario: ${escapeHtml(o.recipient||'—')}</p>${o.dedication?`<blockquote>${escapeHtml(o.dedication)}</blockquote>`:''}<footer><label>Estado<select class="order-status">${Object.entries(orderStates).map(([value,label])=>`<option value="${value}" ${o.status===value?'selected':''}>${label}</option>`).join('')}</select></label>${phone?`<a target="_blank" rel="noopener" href="https://wa.me/${phone}?text=${encodeURIComponent(`Hola, te escribimos de La Vie en Rose sobre tu pedido ${o.ref}.`)}">WhatsApp</a>`:''}<button type="button" class="quiet print-order">Imprimir ficha</button></footer></article>`;
   }).join('') || '<p class="empty">No hay pedidos en este apartado.</p>';
+  document.querySelectorAll('[data-order]').forEach(card=>{const o=orders.find(x=>x.id===card.dataset.order);card.querySelector('footer').insertAdjacentHTML('beforebegin',`<div class="order-extra"><p>Remitente: ${escapeHtml(o.senderName||o.customer.name||'—')} · ${escapeHtml(o.senderPhone||o.customer.phone||'—')}</p><p>Móvil del destinatario: ${escapeHtml(o.recipientPhone||'—')}</p>${o.pickupAt?`<p>Recogida solicitada: ${orderDate(o.pickupAt)}</p>`:''}${o.deliveryWindow?`<p>Franja aproximada: ${escapeHtml(o.deliveryWindow)} (Madrid)</p>`:''}${o.courierNote?`<p>Nota: ${escapeHtml(o.courierNote)}</p>`:''}</div>`);});
 }
 async function loadOrders() {
   if(loadingOrders) return; loadingOrders=true;

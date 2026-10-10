@@ -1,5 +1,6 @@
 import { defaultHours, validateHours, isWorking, workingReady } from './hours.js';
 import { orderWebhook, recordOrder, listOrders, ensureOrders } from './orders.js';
+import { validateSlots, validateSelection } from './scheduling.js';
 const json = (data, status = 200, extra = {}) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra }
 });
@@ -162,6 +163,7 @@ async function saveSettings(request, env) {
   const location = await geocodeAddress(storeAddress, env);
   const currentSettings = await getSettings(env);
   const hours = validateHours(body.hours || currentSettings.hours);
+  if(hours.deliverySlots) validateSlots(hours.deliverySlots);
   await env.DB.prepare('INSERT INTO shop_hours (id, hours_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET hours_json=excluded.hours_json').bind(JSON.stringify(hours)).run();
   await env.DB.prepare('INSERT INTO shop_settings (id, store_address, store_lat, store_lng, pickup_lead_minutes, delivery_lead_minutes, updated_at) VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET store_address=excluded.store_address, store_lat=excluded.store_lat, store_lng=excluded.store_lng, pickup_lead_minutes=excluded.pickup_lead_minutes, delivery_lead_minutes=excluded.delivery_lead_minutes, updated_at=CURRENT_TIMESTAMP').bind(storeAddress, location.lat, location.lng, pickupLeadMinutes, deliveryLeadMinutes).run();
   return json({ ok: true, settings: await getSettings(env), resolvedAddress: location.address });
@@ -188,10 +190,14 @@ async function createCheckout(request, env) {
   const fulfillment = payload.fulfillment === 'delivery' ? 'delivery' : 'pickup';
   const settings = await getSettings(env);
   let deliveryAt = '', deliveryQuote = null;
+  const selection = validateSelection(payload, settings);
+  const contact = payload.contact || {};
+  const phoneValid = v => /^\+?[0-9 ()-]{9,25}$/.test(String(v||''));
+  if(!safeText(contact.senderName,90)||!safeText(contact.recipientName,90)||!phoneValid(contact.senderPhone)||!phoneValid(contact.recipientPhone)) return json({error:'Completa nombres y móviles del remitente y destinatario.'},400);
   if (fulfillment === 'delivery') {
     deliveryQuote = await verifyDeliveryQuote(payload.deliveryQuoteToken, env);
     if (!deliveryQuote) return json({ error: 'Calcula de nuevo el envío antes de pagar.' }, 400);
-    const requested = new Date(payload.deliveryAt);
+    const requested = new Date(selection.deliveryAt);
     if (Number.isNaN(requested.getTime()) || requested.getTime() < workingReady(new Date(), settings.deliveryLeadMinutes, settings.hours).getTime()) return json({ error: `La entrega requiere al menos ${settings.deliveryLeadMinutes} minutos laborables de preparación.` }, 400);
     const clock = madridClockMinutes(requested);
     if (!isWorking(requested, settings.hours, true)) return json({ error: 'Elige una fecha y hora dentro del horario de apertura de ese día.' }, 400);
@@ -203,6 +209,11 @@ async function createCheckout(request, env) {
   const form = new URLSearchParams({ mode: 'payment', locale: 'es', success_url: `${origin}/api/checkout/success?session_id={CHECKOUT_SESSION_ID}`, cancel_url: `${origin}/?checkout=cancelled`, 'phone_number_collection[enabled]': 'true', 'payment_method_types[0]': 'card', 'invoice_creation[enabled]': 'true', client_reference_id: orderRef, 'metadata[order_ref]': orderRef, 'metadata[fulfillment]': fulfillment, 'metadata[delivery_at]': deliveryAt, 'metadata[pickup_lead_minutes]': String(settings.pickupLeadMinutes), 'custom_fields[0][key]': 'recipient_name', 'custom_fields[0][label][type]': 'custom', 'custom_fields[0][label][custom]': 'Nombre de quien recibe', 'custom_fields[0][type]': 'text', 'custom_fields[0][optional]': 'false', 'custom_fields[1][key]': 'dedication', 'custom_fields[1][label][type]': 'custom', 'custom_fields[1][label][custom]': 'Dedicatoria (opcional)', 'custom_fields[1][type]': 'text', 'custom_fields[1][optional]': 'true' });
   // Keep standard Stripe receipts without creating a paid post-payment invoice.
   form.set('invoice_creation[enabled]', 'false');
+  // Recipient details were collected on the storefront; only dedication stays in Checkout.
+  for(const key of [...form.keys()]) if(key.startsWith('custom_fields[0]')) form.delete(key);
+  for(const [key,value] of [...form.entries()]) if(key.startsWith('custom_fields[1]')) {form.delete(key);form.set(key.replace('custom_fields[1]','custom_fields[0]'),value);}
+  form.set('expires_at', String(Math.floor(Date.now()/1000)+1800));
+  for(const [key,value] of Object.entries({sender_name:safeText(contact.senderName,90),sender_phone:safeText(contact.senderPhone,25),recipient_name:safeText(contact.recipientName,90),recipient_phone:safeText(contact.recipientPhone,25),courier_note:safeText(contact.note,400),pickup_at:selection.pickupAt,delivery_window:selection.deliveryWindow})) form.set(`metadata[${key}]`,value);
   form.set('payment_intent_data[description]', `La Vie en Rose · Pedido ${orderRef}`);
   form.set('payment_intent_data[metadata][order_ref]', orderRef);
   if (fulfillment === 'delivery') {
@@ -277,6 +288,7 @@ export default {
       if (url.pathname === '/api/checkout' && request.method === 'POST') return createCheckout(request, env);
       if (url.pathname === '/api/checkout/success' && request.method === 'GET') return confirmCheckout(url, env);
     } catch (error) {
+      if(error?.message==='INVALID_SCHEDULE')return json({error:'Revisa el día y horario: debe cumplir el plazo mínimo y el horario de apertura. Si ha pasado tiempo, elige una opción posterior.'},400);
       console.error(error);
       if (error?.message === 'INVALID_HOURS') return json({ error: 'Revisa los horarios: apertura anterior al cierre y al menos un día semanal abierto.' }, 400);
       if (error?.message === 'INVALID_CART') return json({ error: 'Algún producto ya no está disponible. Actualiza la página y revisa la cesta.' }, 400);

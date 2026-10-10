@@ -28,6 +28,7 @@ export async function recordOrder(id, env, stripe) {
   const field = key => session.custom_fields?.find(f => f.key === key)?.text?.value || '';
   const details = {items:lines.map(l=>({name:l.description,quantity:l.quantity,total:l.amount_total})), total:session.amount_total,currency:session.currency, customer:session.customer_details || {}, recipient:field('recipient_name'),dedication:field('dedication'), fulfillment:session.metadata?.fulfillment || 'pickup',deliveryAt:session.metadata?.delivery_at || '',address:session.metadata?.delivery_address_quoted || '',shipping:session.collected_information?.shipping_details || session.shipping_details || null,pickupLeadMinutes:Number(session.metadata?.pickup_lead_minutes || 120),paymentId:session.payment_intent, live:session.livemode};
   await ensureOrders(env);
+  Object.assign(details,{senderName:session.metadata?.sender_name||details.customer.name,senderPhone:session.metadata?.sender_phone||details.customer.phone,recipient:session.metadata?.recipient_name||details.recipient,recipientPhone:session.metadata?.recipient_phone||'',courierNote:session.metadata?.courier_note||'',pickupAt:session.metadata?.pickup_at||'',deliveryWindow:session.metadata?.delivery_window||''});
   await env.DB.prepare('INSERT INTO orders (session_id,order_ref,paid_at,details) VALUES (?,?,?,?) ON CONFLICT(session_id) DO NOTHING').bind(id,session.client_reference_id,session.created,JSON.stringify(details)).run();
   return true;
 }

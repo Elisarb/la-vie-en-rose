@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {defaultHours} from '../hours.js';
+import {fromMadrid,madridLocal,availableSlots,validateSelection,validateSlots} from '../scheduling.js';
+const settings={hours:defaultHours(),pickupLeadMinutes:120,deliveryLeadMinutes:300};
+const now=fromMadrid('2026-10-10T10:00');
+assert.equal(madridLocal(fromMadrid('2026-10-10T17:00')),'2026-10-10T17:00');
+assert.deepEqual(availableSlots('2026-10-10',settings,now).map(s=>s.available),[false,false,true]);
+assert.throws(()=>validateSelection({fulfillment:'pickup',pickupLocal:'2026-10-10T11:00'},settings,now));
+assert.equal(validateSelection({fulfillment:'pickup',pickupLocal:'2026-10-10T12:00'},settings,now).pickupAt,'2026-10-10T10:00:00.000Z');
+assert.equal(validateSelection({fulfillment:'delivery',deliveryDate:'2026-10-10',deliverySlot:2},settings,now).deliveryWindow,'17:00–20:30');
+settings.hours.dates['2026-10-11']={open:'10:00',close:'20:30',closed:true};
+assert.deepEqual(availableSlots('2026-10-11',settings,now).map(s=>s.available),[false,false,false]);
+assert.throws(()=>fromMadrid('2026-03-29T02:30'));
+assert.throws(()=>validateSlots([{start:'10:00',end:'14:00'},{start:'13:00',end:'17:00'},{start:'17:00',end:'20:30'}]));
+console.log('Horarios Madrid, mínimos, franjas, cierres y cambio de hora: OK');

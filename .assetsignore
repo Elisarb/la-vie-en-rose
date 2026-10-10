@@ -4,3 +4,4 @@ wrangler.jsonc
 .git/**
 tests/**
 orders.js
+PEDIDOS.md

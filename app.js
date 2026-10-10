@@ -59,6 +59,7 @@ let deliveryQuote = null;
 let fulfillment = 'pickup';
 
 import { workingReady, isWorking } from './hours.js';
+import { madridLocal, availableSlots, validateSelection } from './scheduling.js';
 function earliestWorkingDelivery(from = new Date(), leadMinutes = shopSettings.deliveryLeadMinutes) {
   return workingReady(from, leadMinutes, shopSettings.hours);
 }
@@ -89,6 +90,7 @@ async function loadShopSettings() {
     const response = await fetch('/api/settings', { headers: { accept: 'application/json' } });
     if (!response.ok) return;
     shopSettings = await response.json();
+    refreshSchedule();
     document.querySelector('#delivery-time-help').textContent = `Mínimo ${formatDuration(shopSettings.deliveryLeadMinutes)} laborables · Según el horario de apertura de cada día (Madrid)`;
     document.querySelector('#urgent-delivery-note').firstChild.textContent = `¿Lo necesitas antes de ${formatDuration(shopSettings.deliveryLeadMinutes)}? `;
     document.querySelector('#pickup-ready strong').textContent = `${formatDuration(shopSettings.pickupLeadMinutes)} laborables`;
@@ -111,6 +113,36 @@ function updateFulfillmentNote() {
   else note.textContent = 'Introduce la dirección para calcular el delivery.';
 }
 function saveCart() { localStorage.setItem('lavie-cart', JSON.stringify(cart)); renderCart(); }
+document.querySelector('#delivery-time').hidden=true;
+document.querySelector('label[for="delivery-time"]').hidden=true;
+document.querySelector('#delivery-time-help').insertAdjacentHTML('beforebegin','<label>Día de entrega<input id="delivery-date" type="date"></label><label>Franja aproximada de entrega<select id="delivery-slot"></select></label>');
+document.querySelector('.stripeEmailNote').insertAdjacentHTML('beforebegin',`<form id="order-details" class="orderDetails"><div id="pickup-schedule"><label>Día y hora de recogida<input id="pickup-local" type="datetime-local" step="900" required></label></div><p>Horarios de Madrid. Elige una fecha posterior al mínimo de preparación.</p><label>Nombre del remitente<input name="senderName" maxlength="90" autocomplete="name" required></label><label>Móvil del remitente<input name="senderPhone" type="tel" maxlength="25" autocomplete="tel" required></label><label>Nombre del destinatario<input name="recipientName" maxlength="90" required></label><label>Móvil del destinatario<input name="recipientPhone" type="tel" maxlength="25" required></label><label>Nota para la tienda o repartidor (opcional)<textarea name="note" maxlength="400"></textarea></label></form>`);
+function refreshSchedule(){
+  const ready=workingReady(new Date(),shopSettings.pickupLeadMinutes,shopSettings.hours);
+  document.querySelector('#pickup-local').min=madridLocal(ready);
+  document.querySelector('#pickup-local').required=fulfillment==='pickup';
+  document.querySelector('#pickup-schedule').hidden=fulfillment!=='pickup';
+  const date=document.querySelector('#delivery-date');date.min=madridLocal(new Date()).slice(0,10);
+  const select=document.querySelector('#delivery-slot'),previous=select.value;
+  select.innerHTML='<option value="">Elige una franja</option>';
+  if(date.value){try{select.innerHTML+=availableSlots(date.value,shopSettings).map(s=>`<option value="${s.index}" ${s.available?'':'disabled'}>${s.start}–${s.end}${s.available?'':' · No disponible'}</option>`).join('');}catch{}}
+  if([...select.options].some(o=>o.value===previous&&!o.disabled))select.value=previous;
+}
+document.querySelector('#delivery-date').addEventListener('change',refreshSchedule);
+document.querySelectorAll('[name=fulfillment]').forEach(input=>input.addEventListener('change',refreshSchedule));
+document.querySelector('#checkout').addEventListener('click',async event=>{
+  event.stopImmediatePropagation();event.preventDefault();
+  const form=document.querySelector('#order-details');if(!form.reportValidity())return;
+  const payload={items:cartLines().map(x=>({id:x.product.id,quantity:x.qty})),fulfillment,pickupLocal:document.querySelector('#pickup-local').value,deliveryDate:document.querySelector('#delivery-date').value,deliverySlot:document.querySelector('#delivery-slot').value,deliveryQuoteToken:deliveryQuote?.token||'',contact:Object.fromEntries(new FormData(form))};
+  const button=event.currentTarget;
+  try{
+    if(!CONFIG.stripeCheckoutEndpoint)throw new Error('El pago está disponible en la web de Cloudflare.');
+    if(fulfillment==='delivery'&&(!deliveryQuote||payload.deliverySlot===''))throw new Error('Calcula el delivery y elige día y franja.');
+    validateSelection(payload,shopSettings);button.disabled=true;
+    const response=await fetch(CONFIG.stripeCheckoutEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),data=await response.json();
+    if(!response.ok||!data.url)throw new Error(data.error||'No se pudo iniciar el pago.');location.href=data.url;
+  }catch(error){show(error.message==='INVALID_SCHEDULE'?'El horario no cumple la preparación mínima o la apertura. Elige otro horario.':error.message);button.disabled=false;refreshSchedule();}
+},true);
 function add(id) { cart[id] = (cart[id] || 0) + 1; saveCart(); show('Añadido a tu cesta ♡'); }
 function change(id, delta) { cart[id] = (cart[id] || 0) + delta; if (cart[id] <= 0) delete cart[id]; saveCart(); }
 function cartLines() { return Object.entries(cart).map(([id, qty]) => ({ product: products.find(p => p.id === id), qty })).filter(x => x.product); }
